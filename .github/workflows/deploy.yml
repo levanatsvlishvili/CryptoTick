@@ -1,0 +1,42 @@
+name: CryptoTick Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Ingestion Service (Lambda JAR)
+        run: |
+          cd services/ingestion-service
+          mvn clean package -DskipTests
+
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::007400345180:role/GitHubActionsWorkflowRole 
+          aws-region: eu-central-1
+
+      - name: CDK Deploy
+        run: |
+          cd infra
+          cdk deploy --require-approval never
