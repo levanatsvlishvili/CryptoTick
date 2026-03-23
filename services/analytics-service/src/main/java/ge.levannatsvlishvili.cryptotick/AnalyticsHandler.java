@@ -6,8 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.*;
 
 import java.util.Map;
 
@@ -15,6 +14,9 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
     private final ObjectMapper mapper = new ObjectMapper();
     private final DynamoDbClient dynamoDb = DynamoDbClient.builder().build();
     private final String TABLE_NAME = "CryptoTick_Alerts";
+
+    private static final double THRESHOLD = 0.001;
+    private static double lastPrice = 0;
 
     @Override
     public String handleRequest(SQSEvent event, Context context) {
@@ -24,14 +26,26 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                 double currentPrice = root.get("price").asDouble();
                 String symbol = root.get("symbol").asText();
 
-                if (currentPrice > 0) { 
+                context.getLogger().log("Processing " + symbol + ": " + currentPrice);
+
+                if (shouldAlert(currentPrice)) {
                     saveAlert(symbol, currentPrice);
+                    context.getLogger().log("!!! ALERT SAVED: Significant price movement detected !!!");
                 }
+
+                lastPrice = currentPrice;
+
             } catch (Exception e) {
-                context.getLogger().log("Error processing message: " + e.getMessage());
+                context.getLogger().log("Error: " + e.getMessage());
             }
         }
-        return "Processed " + event.getRecords().size() + " messages";
+        return "Success";
+    }
+
+    private boolean shouldAlert(double currentPrice) {
+        if (lastPrice == 0) return true;
+        double change = Math.abs(currentPrice - lastPrice) / lastPrice;
+        return change >= THRESHOLD;
     }
 
     private void saveAlert(String symbol, double price) {
@@ -40,7 +54,8 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                 .item(Map.of(
                         "symbol", AttributeValue.builder().s(symbol).build(),
                         "timestamp", AttributeValue.builder().n(String.valueOf(System.currentTimeMillis())).build(),
-                        "price", AttributeValue.builder().n(String.valueOf(price)).build()
+                        "price", AttributeValue.builder().n(String.valueOf(price)).build(),
+                        "type", AttributeValue.builder().s("VOLATILITY_ALERT").build()
                 ))
                 .build());
     }
