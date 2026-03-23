@@ -45,7 +45,7 @@ public class InfraStack extends Stack {
 
         Function ingestionLambda = Function.Builder.create(this, "IngestionLambda")
                 .runtime(Runtime.JAVA_17)
-                .handler("ge.levannatsvlishvili.IngestionHandler")
+                .handler("ge.levannatsvlishvili.cryptotick.IngestionHandler")
                 .code(Code.fromAsset("../services/ingestion-service/target/ingestion-service-1.0-SNAPSHOT.jar"))
                 .timeout(Duration.seconds(30))
                 .memorySize(512)
@@ -63,6 +63,8 @@ public class InfraStack extends Stack {
                 .runtime(Runtime.JAVA_17)
                 .handler("ge.levannatsvlishvili.cryptotick.AnalyticsHandler")
                 .code(Code.fromAsset("../services/analytics-service/target/analytics-service-1.0-SNAPSHOT.jar"))
+                .timeout(Duration.seconds(30))
+                .memorySize(512)
                 .build();
 
         ingestionQueue.grantConsumeMessages(analyticsLambda);
