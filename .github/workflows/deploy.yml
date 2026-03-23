@@ -22,10 +22,10 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build Ingestion Service (Lambda JAR)
+      - name: Build All Services
         run: |
-          cd services/ingestion-service
-          mvn clean package -DskipTests
+          mvn -f services/ingestion-service/pom.xml clean package -DskipTests
+          mvn -f services/analytics-service/pom.xml clean package -DskipTests
 
       - name: Install AWS CDK
         run: npm install -g aws-cdk
@@ -33,7 +33,7 @@ jobs:
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          role-to-assume: arn:aws:iam::007400345180:role/GitHubActionsWorkflowRole 
+          role-to-assume: arn:aws:iam::007400345180:role/GitHubActionsWorkflowRole
           aws-region: eu-central-1
 
       - name: CDK Deploy

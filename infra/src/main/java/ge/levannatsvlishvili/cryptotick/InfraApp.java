@@ -1,4 +1,4 @@
-package ge.levannatsvlishvili;
+package ge.levannatsvlishvili.cryptotick;
 
 import software.amazon.awscdk.App;
 import software.amazon.awscdk.StackProps;

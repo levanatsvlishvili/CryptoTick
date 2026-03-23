@@ -1,4 +1,4 @@
-package ge.levannatsvlishvili;
+package ge.levannatsvlishvili.cryptotick;
 
 import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.Stack;
@@ -58,5 +58,16 @@ public class InfraStack extends Stack {
                 .schedule(Schedule.expression("rate(1 minute)"))
                 .build();
         eventRule.addTarget(new LambdaFunction(ingestionLambda));
+
+        Function analyticsLambda = Function.Builder.create(this, "AnalyticsLambda")
+                .runtime(Runtime.JAVA_17)
+                .handler("ge.levannatsvlishvili.cryptotick.AnalyticsHandler")
+                .code(Code.fromAsset("../services/analytics-service/target/analytics-service-1.0-SNAPSHOT.jar"))
+                .build();
+
+        ingestionQueue.grantConsumeMessages(analyticsLambda);
+        alertsTable.grantWriteData(analyticsLambda);
+
+        analyticsLambda.addEventSource(new software.amazon.awscdk.services.lambda.eventsources.SqsEventSource(ingestionQueue));
     }
 }

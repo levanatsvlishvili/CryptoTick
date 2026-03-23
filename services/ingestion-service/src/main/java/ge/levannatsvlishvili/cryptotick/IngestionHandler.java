@@ -1,4 +1,4 @@
-package ge.levannatsvlishvili;
+package ge.levannatsvlishvili.cryptotick;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
