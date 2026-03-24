@@ -7,13 +7,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.services.sns.SnsClient;
+import software.amazon.awssdk.services.sns.model.PublishRequest;
 
 import java.util.Map;
 
 public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
     private final ObjectMapper mapper = new ObjectMapper();
     private final DynamoDbClient dynamoDb = DynamoDbClient.builder().build();
+    private final SnsClient snsClient = SnsClient.builder().build();
+
     private final String TABLE_NAME = "CryptoTick_Alerts";
+    private final String SNS_TOPIC_ARN = System.getenv("SNS_TOPIC_ARN");
 
     private static final double THRESHOLD = 0.001;
     private static double lastPrice = 0;
@@ -29,14 +34,13 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                 context.getLogger().log("Processing " + symbol + ": " + currentPrice);
 
                 if (shouldAlert(currentPrice)) {
-                    saveAlert(symbol, currentPrice);
-                    context.getLogger().log("!!! ALERT SAVED: Significant price movement detected !!!");
+                    processAlert(symbol, currentPrice, context);
                 }
 
                 lastPrice = currentPrice;
 
             } catch (Exception e) {
-                context.getLogger().log("Error: " + e.getMessage());
+                context.getLogger().log("Error in handleRequest: " + e.getMessage());
             }
         }
         return "Success";
@@ -48,7 +52,13 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
         return change >= THRESHOLD;
     }
 
-    private void saveAlert(String symbol, double price) {
+    private void processAlert(String symbol, double price, Context context) {
+        saveToDynamo(symbol, price);
+        sendSnsNotification(symbol, price);
+        context.getLogger().log("!!! ALERT PROCESSED: " + symbol + " at $" + price + " !!!");
+    }
+
+    private void saveToDynamo(String symbol, double price) {
         dynamoDb.putItem(PutItemRequest.builder()
                 .tableName(TABLE_NAME)
                 .item(Map.of(
@@ -57,6 +67,16 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                         "price", AttributeValue.builder().n(String.valueOf(price)).build(),
                         "type", AttributeValue.builder().s("VOLATILITY_ALERT").build()
                 ))
+                .build());
+    }
+
+    private void sendSnsNotification(String symbol, double price) {
+        String message = String.format("CryptoTick Alert! %s movement detected. Current price: $%.2f", symbol, price);
+
+        snsClient.publish(PublishRequest.builder()
+                .topicArn(SNS_TOPIC_ARN)
+                .subject("CryptoTick Alert: " + symbol)
+                .message(message)
                 .build());
     }
 }

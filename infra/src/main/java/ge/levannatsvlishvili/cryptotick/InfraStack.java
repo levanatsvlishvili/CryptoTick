@@ -12,6 +12,8 @@ import software.amazon.awscdk.services.events.*;
 import software.amazon.awscdk.services.events.targets.LambdaFunction;
 import software.amazon.awscdk.Duration;
 import software.constructs.Construct;
+import software.amazon.awscdk.services.sns.*;
+import software.amazon.awscdk.services.sns.subscriptions.*;
 import java.util.Map;
 
 public class InfraStack extends Stack {
@@ -59,17 +61,26 @@ public class InfraStack extends Stack {
                 .build();
         eventRule.addTarget(new LambdaFunction(ingestionLambda));
 
+        Topic alertTopic = Topic.Builder.create(this, "CryptoAlertTopic")
+                .topicName("CryptoTick_Alerts_Topic")
+                .build();
+
+        alertTopic.addSubscription(new EmailSubscription("levan.natsvlishvili3@gmail.com"));
+
         Function analyticsLambda = Function.Builder.create(this, "AnalyticsLambda")
                 .runtime(Runtime.JAVA_17)
                 .handler("ge.levannatsvlishvili.cryptotick.AnalyticsHandler")
                 .code(Code.fromAsset("../services/analytics-service/target/analytics-service-1.0-SNAPSHOT.jar"))
                 .timeout(Duration.seconds(30))
                 .memorySize(512)
+                .environment(Map.of("SNS_TOPIC_ARN", alertTopic.getTopicArn()))
                 .build();
 
         ingestionQueue.grantConsumeMessages(analyticsLambda);
         alertsTable.grantWriteData(analyticsLambda);
 
         analyticsLambda.addEventSource(new software.amazon.awscdk.services.lambda.eventsources.SqsEventSource(ingestionQueue));
+
+        alertTopic.grantPublish(analyticsLambda);
     }
 }
