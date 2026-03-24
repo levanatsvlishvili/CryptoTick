@@ -26,6 +26,7 @@ jobs:
         run: |
           mvn -f services/ingestion-service/pom.xml clean package -DskipTests
           mvn -f services/analytics-service/pom.xml clean package -DskipTests
+          mvn -f services/api-service/pom.xml clean package -DskipTests
 
       - name: Install AWS CDK
         run: npm install -g aws-cdk

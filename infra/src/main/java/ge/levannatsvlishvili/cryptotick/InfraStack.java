@@ -14,6 +14,7 @@ import software.amazon.awscdk.Duration;
 import software.constructs.Construct;
 import software.amazon.awscdk.services.sns.*;
 import software.amazon.awscdk.services.sns.subscriptions.*;
+import software.amazon.awscdk.services.apigateway.*;
 import java.util.Map;
 
 public class InfraStack extends Stack {
@@ -82,5 +83,20 @@ public class InfraStack extends Stack {
         analyticsLambda.addEventSource(new software.amazon.awscdk.services.lambda.eventsources.SqsEventSource(ingestionQueue));
 
         alertTopic.grantPublish(analyticsLambda);
+
+        Function getAlertsLambda = Function.Builder.create(this, "GetAlertsLambda")
+                .runtime(Runtime.JAVA_17)
+                .handler("ge.levannatsvlishvili.cryptotick.GetAlertsHandler")
+                .code(Code.fromAsset("../services/api-service/target/api-service-1.0-SNAPSHOT.jar"))
+                .memorySize(512)
+                .timeout(Duration.seconds(20))
+                .build();
+
+        alertsTable.grantReadData(getAlertsLambda);
+
+        LambdaRestApi api = LambdaRestApi.Builder.create(this, "CryptoTickApi")
+                .handler(getAlertsLambda)
+                .proxy(true)
+                .build();
     }
 }
