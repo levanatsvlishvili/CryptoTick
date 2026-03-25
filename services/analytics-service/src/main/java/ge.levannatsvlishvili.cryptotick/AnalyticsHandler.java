@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
     private final ObjectMapper mapper = new ObjectMapper();
@@ -21,7 +22,7 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
     private final String SNS_TOPIC_ARN = System.getenv("SNS_TOPIC_ARN");
 
     private static final double THRESHOLD = 0.001;
-    private static double lastPrice = 0;
+    private static final Map<String, Double> lastPrices = new ConcurrentHashMap<>();
 
     @Override
     public String handleRequest(SQSEvent event, Context context) {
@@ -33,11 +34,11 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
 
                 context.getLogger().log("Processing " + symbol + ": " + currentPrice);
 
-                if (shouldAlert(currentPrice)) {
+                if (shouldAlert(symbol, currentPrice)) {
                     processAlert(symbol, currentPrice, context);
                 }
 
-                lastPrice = currentPrice;
+                lastPrices.put(symbol, currentPrice);
 
             } catch (Exception e) {
                 context.getLogger().log("Error in handleRequest: " + e.getMessage());
@@ -46,9 +47,12 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
         return "Success";
     }
 
-    private boolean shouldAlert(double currentPrice) {
-        if (lastPrice == 0) return true;
-        double change = Math.abs(currentPrice - lastPrice) / lastPrice;
+    private boolean shouldAlert(String symbol, double currentPrice) {
+        if (!lastPrices.containsKey(symbol)) {
+            return true;
+        }
+        double previousPrice = lastPrices.get(symbol);
+        double change = Math.abs(currentPrice - previousPrice) / previousPrice;
         return change >= THRESHOLD;
     }
 
