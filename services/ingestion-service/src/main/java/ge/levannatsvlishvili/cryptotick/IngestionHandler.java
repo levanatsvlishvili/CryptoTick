@@ -46,14 +46,17 @@ public class IngestionHandler implements RequestHandler<Object, String> {
                 }
             }
 
-            if (!entries.isEmpty()) {
+            for (int i = 0; i < entries.size(); i += 10) {
+                int toIndex = Math.min(i + 10, entries.size());
+                List<SendMessageBatchRequestEntry> batch = entries.subList(i, toIndex);
+
                 sqsClient.sendMessageBatch(SendMessageBatchRequest.builder()
                         .queueUrl(queueUrl)
-                        .entries(entries)
+                        .entries(batch)
                         .build());
             }
 
-            return "Successfully ingested " + count + " symbols";
+            return "Successfully ingested " + count + " symbols in batches of 10";
         } catch (Exception e) {
             context.getLogger().log("Ingestion Error: " + e.getMessage());
             return "Failed";
