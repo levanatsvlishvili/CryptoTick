@@ -15,6 +15,9 @@ import software.constructs.Construct;
 import software.amazon.awscdk.services.sns.*;
 import software.amazon.awscdk.services.sns.subscriptions.*;
 import software.amazon.awscdk.services.apigateway.*;
+import software.amazon.awscdk.services.apigateway.*;
+
+import java.util.List;
 import java.util.Map;
 
 public class InfraStack extends Stack {
@@ -94,9 +97,22 @@ public class InfraStack extends Stack {
 
         alertsTable.grantReadData(getAlertsLambda);
 
+        CognitoUserPoolsAuthorizer authorizer = CognitoUserPoolsAuthorizer.Builder.create(this, "CryptoTickAuthorizer")
+                .cognitoUserPools(List.of(userPool))
+                .authorizerName("CryptoTick_Authorizer")
+                .build();
+
         LambdaRestApi api = LambdaRestApi.Builder.create(this, "CryptoTickApi")
                 .handler(getAlertsLambda)
                 .proxy(true)
+                .defaultCorsPreflightOptions(CorsOptions.builder()
+                        .allowOrigins(Cors.ALL_ORIGINS)
+                        .allowMethods(Cors.ALL_METHODS)
+                        .build())
+                .defaultMethodOptions(MethodOptions.builder()
+                        .authorizer(authorizer)
+                        .authorizationType(AuthorizationType.COGNITO)
+                        .build())
                 .build();
     }
 }
