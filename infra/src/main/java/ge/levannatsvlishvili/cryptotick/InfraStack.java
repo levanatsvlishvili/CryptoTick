@@ -45,8 +45,26 @@ public class InfraStack extends Stack {
                 .removalPolicy(RemovalPolicy.DESTROY)
                 .build();
 
-        userPool.addClient("CryptoTickWebClient", UserPoolClientOptions.builder()
-                .authFlows(AuthFlow.builder().userPassword(true).build())
+        UserPoolClient webClient = userPool.addClient("CryptoTickWebClient", UserPoolClientOptions.builder()
+                .userPoolClientName("CryptoTickWebClient")
+                .generateSecret(false)
+                .authFlows(AuthFlow.builder()
+                        .userPassword(true)
+                        .build())
+                .oAuth(OAuthSettings.builder()
+                        .flows(OAuthFlows.builder()
+                                .implicitCodeGrant(true)
+                                .build())
+                        .scopes(List.of(OAuthScope.EMAIL, OAuthScope.OPENID, OAuthScope.PROFILE))
+                        .callbackUrls(List.of("https://oauth.pstmn.io/v1/callback"))
+                        .build())
+                .supportedIdentityProviders(List.of(UserPoolClientIdentityProvider.COGNITO))
+                .build());
+
+        userPool.addDomain("CryptoTickDomain", UserPoolDomainOptions.builder()
+                .cognitoDomain(CognitoDomainOptions.builder()
+                        .domainPrefix("cryptotick-levan-v3")
+                        .build())
                 .build());
 
         Function ingestionLambda = Function.Builder.create(this, "IngestionLambda")
