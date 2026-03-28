@@ -18,68 +18,78 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
     private final DynamoDbClient dynamoDb = DynamoDbClient.builder().build();
     private final SnsClient snsClient = SnsClient.builder().build();
 
-    private final String TABLE_NAME = "CryptoTick_Alerts";
+    private final String ALERTS_TABLE = "CryptoTick_Alerts";
+    private final String SETTINGS_TABLE = System.getenv("USER_SETTINGS_TABLE");
     private final String SNS_TOPIC_ARN = System.getenv("SNS_TOPIC_ARN");
 
-    private static final double THRESHOLD = 0.001;
     private static final Map<String, Double> lastPrices = new ConcurrentHashMap<>();
 
     @Override
     public String handleRequest(SQSEvent event, Context context) {
+        double userThreshold = getGlobalThreshold(context);
+
         for (SQSEvent.SQSMessage msg : event.getRecords()) {
             try {
                 JsonNode root = mapper.readTree(msg.getBody());
                 double currentPrice = root.get("price").asDouble();
                 String symbol = root.get("symbol").asText();
 
-                context.getLogger().log("Processing " + symbol + ": " + currentPrice);
-
-                if (shouldAlert(symbol, currentPrice)) {
-                    processAlert(symbol, currentPrice, context);
+                if (shouldAlert(symbol, currentPrice, userThreshold)) {
+                    processAlert(symbol, currentPrice, userThreshold, context);
                 }
 
                 lastPrices.put(symbol, currentPrice);
 
             } catch (Exception e) {
-                context.getLogger().log("Error in handleRequest: " + e.getMessage());
+                context.getLogger().log("Error: " + e.getMessage());
             }
         }
         return "Success";
     }
 
-    private boolean shouldAlert(String symbol, double currentPrice) {
-        if (!lastPrices.containsKey(symbol)) {
-            return true;
+    private double getGlobalThreshold(Context context) {
+        try {
+            ScanResponse response = dynamoDb.scan(ScanRequest.builder().tableName(SETTINGS_TABLE).limit(1).build());
+            if (!response.items().isEmpty()) {
+                return Double.parseDouble(response.items().get(0).get("threshold").n());
+            }
+        } catch (Exception e) {
+            context.getLogger().log("Settings not found, using default 0.1%");
         }
-        double previousPrice = lastPrices.get(symbol);
-        double change = Math.abs(currentPrice - previousPrice) / previousPrice;
-        return change >= THRESHOLD;
+        return 0.001;
     }
 
-    private void processAlert(String symbol, double price, Context context) {
+    private boolean shouldAlert(String symbol, double currentPrice, double threshold) {
+        if (!lastPrices.containsKey(symbol)) return true;
+        double previousPrice = lastPrices.get(symbol);
+        double change = Math.abs(currentPrice - previousPrice) / previousPrice;
+        return change >= threshold;
+    }
+
+    private void processAlert(String symbol, double price, double threshold, Context context) {
         saveToDynamo(symbol, price);
-        sendSnsNotification(symbol, price);
-        context.getLogger().log("!!! ALERT PROCESSED: " + symbol + " at $" + price + " !!!");
+        sendSnsNotification(symbol, price, threshold);
+        context.getLogger().log("!!! ALERT: " + symbol + " changed more than " + (threshold * 100) + "% !!!");
     }
 
     private void saveToDynamo(String symbol, double price) {
         dynamoDb.putItem(PutItemRequest.builder()
-                .tableName(TABLE_NAME)
+                .tableName(ALERTS_TABLE)
                 .item(Map.of(
                         "symbol", AttributeValue.builder().s(symbol).build(),
                         "timestamp", AttributeValue.builder().n(String.valueOf(System.currentTimeMillis())).build(),
                         "price", AttributeValue.builder().n(String.valueOf(price)).build(),
-                        "type", AttributeValue.builder().s("VOLATILITY_ALERT").build()
+                        "type", AttributeValue.builder().s("DYNAMIC_VOLATILITY_ALERT").build()
                 ))
                 .build());
     }
 
-    private void sendSnsNotification(String symbol, double price) {
-        String message = String.format("CryptoTick Alert! %s movement detected. Current price: $%.2f", symbol, price);
-
+    private void sendSnsNotification(String symbol, double price, double threshold) {
+        String message = String.format("CryptoTick Alert! %s movement detected (>%.2f%%). Price: $%.2f",
+                symbol, threshold * 100, price);
         snsClient.publish(PublishRequest.builder()
                 .topicArn(SNS_TOPIC_ARN)
-                .subject("CryptoTick Alert: " + symbol)
+                .subject("CryptoTick Alert")
                 .message(message)
                 .build());
     }

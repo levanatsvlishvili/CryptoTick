@@ -71,13 +71,23 @@ public class InfraStack extends Stack {
 
         alertTopic.addSubscription(new EmailSubscription("levan.natsvlishvili3@gmail.com"));
 
+        Table userSettingsTable = Table.Builder.create(this, "CryptoUserSettingsTable")
+                .tableName("CryptoTick_UserSettings")
+                .partitionKey(Attribute.builder().name("userId").type(AttributeType.STRING).build())
+                .billingMode(BillingMode.PAY_PER_REQUEST)
+                .removalPolicy(RemovalPolicy.DESTROY)
+                .build();
+
         Function analyticsLambda = Function.Builder.create(this, "AnalyticsLambda")
                 .runtime(Runtime.JAVA_17)
                 .handler("ge.levannatsvlishvili.cryptotick.AnalyticsHandler")
                 .code(Code.fromAsset("../services/analytics-service/target/analytics-service-1.0-SNAPSHOT.jar"))
                 .timeout(Duration.seconds(30))
                 .memorySize(512)
-                .environment(Map.of("SNS_TOPIC_ARN", alertTopic.getTopicArn()))
+                .environment(Map.of(
+                        "SNS_TOPIC_ARN", alertTopic.getTopicArn(),
+                        "USER_SETTINGS_TABLE", userSettingsTable.getTableName() // დაამატე ეს ხაზი
+                ))
                 .build();
 
         ingestionQueue.grantConsumeMessages(analyticsLambda);
@@ -113,13 +123,6 @@ public class InfraStack extends Stack {
                         .authorizer(authorizer)
                         .authorizationType(AuthorizationType.COGNITO)
                         .build())
-                .build();
-
-        Table userSettingsTable = Table.Builder.create(this, "CryptoUserSettingsTable")
-                .tableName("CryptoTick_UserSettings")
-                .partitionKey(Attribute.builder().name("userId").type(AttributeType.STRING).build())
-                .billingMode(BillingMode.PAY_PER_REQUEST)
-                .removalPolicy(RemovalPolicy.DESTROY)
                 .build();
 
         userSettingsTable.grantReadData(analyticsLambda);
