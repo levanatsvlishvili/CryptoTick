@@ -114,5 +114,15 @@ public class InfraStack extends Stack {
                         .authorizationType(AuthorizationType.COGNITO)
                         .build())
                 .build();
+
+        Table userSettingsTable = Table.Builder.create(this, "CryptoUserSettingsTable")
+                .tableName("CryptoTick_UserSettings")
+                .partitionKey(Attribute.builder().name("userId").type(AttributeType.STRING).build())
+                .billingMode(BillingMode.PAY_PER_REQUEST)
+                .removalPolicy(RemovalPolicy.DESTROY)
+                .build();
+
+        userSettingsTable.grantReadData(analyticsLambda);
+        userSettingsTable.grantReadWriteData(getAlertsLambda);
     }
 }
