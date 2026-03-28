@@ -63,7 +63,7 @@ public class InfraStack extends Stack {
 
         userPool.addDomain("CryptoTickDomain", UserPoolDomainOptions.builder()
                 .cognitoDomain(CognitoDomainOptions.builder()
-                        .domainPrefix("cryptotick-levan-auth-" + System.currentTimeMillis() / 10000)
+                        .domainPrefix("cryptotick-levan-app-prod-2026")
                         .build())
                 .build());
 
