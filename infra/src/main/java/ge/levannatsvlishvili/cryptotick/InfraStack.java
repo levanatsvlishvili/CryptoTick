@@ -177,5 +177,9 @@ public class InfraStack extends Stack {
         CfnOutput.Builder.create(this, "BucketName")
                 .value(websiteBucket.getBucketName())
                 .build();
+
+        CfnOutput.Builder.create(this, "DistributionId")
+                .value(distribution.getDistributionId())
+                .build();
     }
 }

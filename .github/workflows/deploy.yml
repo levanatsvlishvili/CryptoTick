@@ -50,9 +50,10 @@ jobs:
           
       - name: Deploy to S3
         run: |
-            aws s3 sync frontend/dist s3://cryptotick-frontend-007400345180 --delete
+          aws s3 sync frontend/dist s3://cryptotick-frontend-007400345180 --delete
 
       - name: CloudFront Invalidation
         run: |
-            DIST_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[0].Id=='InfraStackWebsiteDistributionOrigin1E2B3C4D'].Id" --output text)
-            aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"
+          DIST_ID=$(jq -r '.InfraStack.DistributionId' infra/outputs.json)
+          echo "Invalidating Distribution: $DIST_ID"
+          aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"
