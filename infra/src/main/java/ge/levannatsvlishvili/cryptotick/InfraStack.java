@@ -1,20 +1,23 @@
 package ge.levannatsvlishvili.cryptotick;
 
-import software.amazon.awscdk.RemovalPolicy;
-import software.amazon.awscdk.Stack;
-import software.amazon.awscdk.StackProps;
+import software.amazon.awscdk.*;
+import software.amazon.awscdk.services.cloudfront.BehaviorOptions;
+import software.amazon.awscdk.services.cloudfront.Distribution;
+import software.amazon.awscdk.services.cloudfront.ErrorResponse;
+import software.amazon.awscdk.services.cloudfront.ViewerProtocolPolicy;
+import software.amazon.awscdk.services.cloudfront.origins.S3Origin;
 import software.amazon.awscdk.services.cognito.*;
 import software.amazon.awscdk.services.dynamodb.*;
 import software.amazon.awscdk.services.lambda.*;
 import software.amazon.awscdk.services.lambda.Runtime;
+import software.amazon.awscdk.services.s3.BlockPublicAccess;
+import software.amazon.awscdk.services.s3.Bucket;
 import software.amazon.awscdk.services.sqs.Queue;
 import software.amazon.awscdk.services.events.*;
 import software.amazon.awscdk.services.events.targets.LambdaFunction;
-import software.amazon.awscdk.Duration;
 import software.constructs.Construct;
 import software.amazon.awscdk.services.sns.*;
 import software.amazon.awscdk.services.sns.subscriptions.*;
-import software.amazon.awscdk.services.apigateway.*;
 import software.amazon.awscdk.services.apigateway.*;
 
 import java.util.List;
@@ -146,5 +149,33 @@ public class InfraStack extends Stack {
 
         userSettingsTable.grantReadData(analyticsLambda);
         userSettingsTable.grantReadWriteData(getAlertsLambda);
+
+        Bucket websiteBucket = Bucket.Builder.create(this, "CryptoTickWebsiteBucket")
+                .bucketName("cryptotick-frontend-" + this.getAccount())
+                .removalPolicy(RemovalPolicy.DESTROY)
+                .autoDeleteObjects(true)
+                .blockPublicAccess(BlockPublicAccess.BLOCK_ALL)
+                .build();
+
+        Distribution distribution = Distribution.Builder.create(this, "WebsiteDistribution")
+                .defaultBehavior(BehaviorOptions.builder()
+                        .origin(new S3Origin(websiteBucket))
+                        .viewerProtocolPolicy(ViewerProtocolPolicy.REDIRECT_TO_HTTPS)
+                        .build())
+                .defaultRootObject("index.html")
+                .errorResponses(List.of(ErrorResponse.builder()
+                        .httpStatus(404)
+                        .responseHttpStatus(200)
+                        .responsePagePath("/index.html")
+                        .build()))
+                .build();
+
+        CfnOutput.Builder.create(this, "WebsiteURL")
+                .value(distribution.getDomainName())
+                .build();
+
+        CfnOutput.Builder.create(this, "BucketName")
+                .value(websiteBucket.getBucketName())
+                .build();
     }
 }
