@@ -54,6 +54,10 @@ jobs:
 
       - name: CloudFront Invalidation
         run: |
-          DIST_ID=$(jq -r '.InfraStack.DistributionId' infra/outputs.json)
+          DIST_ID=$(jq -r '.InfraStack.DistributionId' outputs.json)          
+          if [ "$DIST_ID" == "null" ] || [ -z "$DIST_ID" ]; then
+            echo "Error: Could not find DistributionId in outputs.json"
+            exit 1
+          fi          
           echo "Invalidating Distribution: $DIST_ID"
           aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"
