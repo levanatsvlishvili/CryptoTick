@@ -38,26 +38,29 @@ jobs:
           aws-region: eu-central-1
 
       - name: CDK Deploy
+        working-directory: infra
         run: |
-          cd infra
-          cdk deploy --require-approval never
-          
+          cdk deploy --require-approval never --outputs-file outputs.json
+
       - name: Build Frontend
+        working-directory: frontend
         run: |
-          cd frontend
           npm install
           npm run build
-          
+
       - name: Deploy to S3
         run: |
           aws s3 sync frontend/dist s3://cryptotick-frontend-007400345180 --delete
 
       - name: CloudFront Invalidation
         run: |
-          DIST_ID=$(jq -r '.InfraStack.DistributionId' outputs.json)          
+          DIST_ID=$(jq -r '.InfraStack.DistributionId' infra/outputs.json)
+          
           if [ "$DIST_ID" == "null" ] || [ -z "$DIST_ID" ]; then
-            echo "Error: Could not find DistributionId in outputs.json"
+            echo "Error: DistributionId not found in infra/outputs.json"
+            cat infra/outputs.json
             exit 1
-          fi          
+          fi
+          
           echo "Invalidating Distribution: $DIST_ID"
           aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"
