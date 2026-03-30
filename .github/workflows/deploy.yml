@@ -50,7 +50,7 @@ jobs:
           
       - name: Deploy to S3
         run: |
-            aws s3 sync frontend/dist s3://cryptotick-frontend-${{ steps.config.outputs.account_id }} --delete
+            aws s3 sync frontend/dist s3://cryptotick-frontend-007400345180 --delete
 
       - name: CloudFront Invalidation
         run: |
