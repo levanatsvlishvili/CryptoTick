@@ -20,13 +20,17 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
-        String method = input.getHttpMethod();
-
         try {
+            Map<String, Object> authorizer = input.getRequestContext().getAuthorizer();
+            Map<String, Object> claims = (Map<String, Object>) authorizer.get("claims");
+            String userId = (String) claims.get("sub");
+            String email = (String) claims.get("email");
+
+            String method = input.getHttpMethod();
             if ("GET".equalsIgnoreCase(method)) {
-                return handleGetAlerts();
+                return handleGetAlerts(userId);
             } else if ("POST".equalsIgnoreCase(method)) {
-                return handleSaveSettings(input);
+                return handleSaveSettings(input, userId, email);
             }
             return createResponse(405, "{\"error\":\"Method Not Allowed\"}");
         } catch (Exception e) {
@@ -34,32 +38,40 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
         }
     }
 
-    private APIGatewayProxyResponseEvent handleGetAlerts() throws Exception {
-        ScanResponse response = dynamoDb.scan(ScanRequest.builder().tableName(ALERTS_TABLE).limit(20).build());
-        List<Map<String, String>> alerts = response.items().stream().map(item -> {
-            Map<String, String> map = new HashMap<>();
-            item.forEach((k, v) -> map.put(k, v.s() != null ? v.s() : v.n()));
-            return map;
-        }).collect(Collectors.toList());
+    private APIGatewayProxyResponseEvent handleGetAlerts(String userId) throws Exception {
+        Map<String, AttributeValue> expressionValues = Map.of(":v1", AttributeValue.builder().s(userId).build());
+
+        ScanResponse response = dynamoDb.scan(ScanRequest.builder()
+                .tableName(ALERTS_TABLE)
+                .filterExpression("userId = :v1")
+                .expressionAttributeValues(expressionValues)
+                .build());
+
+        List<Map<String, String>> alerts = response.items().stream()
+                .map(item -> {
+                    Map<String, String> map = new HashMap<>();
+                    item.forEach((k, v) -> map.put(k, v.s() != null ? v.s() : v.n()));
+                    return map;
+                })
+                .sorted((a, b) -> b.get("timestamp").compareTo(a.get("timestamp")))
+                .limit(20)
+                .collect(Collectors.toList());
 
         return createResponse(200, mapper.writeValueAsString(alerts));
     }
 
-    private APIGatewayProxyResponseEvent handleSaveSettings(APIGatewayProxyRequestEvent input) throws Exception {
-        Map<String, Object> authorizer = input.getRequestContext().getAuthorizer();
-        Map<String, Object> claims = (Map<String, Object>) authorizer.get("claims");
-        String userId = (String) claims.get("sub");
-        String email = (String) claims.get("email");
-
+    private APIGatewayProxyResponseEvent handleSaveSettings(APIGatewayProxyRequestEvent input, String userId, String email) throws Exception {
         JsonNode body = mapper.readTree(input.getBody());
         double threshold = body.get("threshold").asDouble();
+        String trackedSymbols = body.has("trackedSymbols") ? body.get("trackedSymbols").asText() : "";
 
         dynamoDb.putItem(PutItemRequest.builder()
                 .tableName(SETTINGS_TABLE)
                 .item(Map.of(
                         "userId", AttributeValue.builder().s(userId).build(),
                         "threshold", AttributeValue.builder().n(String.valueOf(threshold)).build(),
-                        "email", AttributeValue.builder().s(email).build()
+                        "email", AttributeValue.builder().s(email).build(),
+                        "trackedSymbols", AttributeValue.builder().s(trackedSymbols).build()
                 ))
                 .build());
 
