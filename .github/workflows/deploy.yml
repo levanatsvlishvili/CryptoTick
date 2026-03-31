@@ -45,6 +45,8 @@ jobs:
       - name: Build Frontend
         working-directory: frontend
         run: |
+          VITE_URL=$(jq -r '.InfraStack.CryptoTickApiEndpointXXXXX' ../infra/outputs.json)
+          echo "VITE_API_URL=$VITE_URL" > .env
           npm install
           npm run build
 
