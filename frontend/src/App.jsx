@@ -20,7 +20,7 @@ function Dashboard({ signOut, user }) {
 
     const showToast = (message, type = 'success') => {
         setToast({ show: true, message, type });
-        setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+        setTimeout(() => setToast({ show: false }), 4000);
     };
 
     const getAlerts = async () => {
@@ -49,9 +49,9 @@ function Dashboard({ signOut, user }) {
                     trackedSymbols: selectedSymbols.join(", ")
                 })
             });
-            showToast("Settings synchronized successfully!");
+            showToast("Success! Your preferences are synchronized with the cloud.");
         } catch (err) {
-            showToast("Failed to update settings", "error");
+            showToast("Error updating preferences", "error");
         }
     };
 
@@ -79,102 +79,96 @@ function Dashboard({ signOut, user }) {
 
     if (loading) {
         return (
-            <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', background: '#f8f9fa' }}>
-                <div className="spinner"></div>
-                <p style={{ marginTop: '20px', fontFamily: 'Inter, sans-serif', color: '#666' }}>Fetching Market Data...</p>
-                <style>{`.spinner { border: 4px solid rgba(0,0,0,0.1); border-top: 4px solid #2196f3; borderRadius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; } @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', background: '#fff' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div className="spinner"></div>
+                    <p style={{ marginTop: '20px', color: '#666', letterSpacing: '1px' }}>INITIALIZING ENGINE...</p>
+                </div>
+                <style>{`.spinner { width: 50px; height: 50px; border: 3px solid #f3f3f3; border-top: 3px solid #2196f3; border-radius: 50%; animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; } @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
             </div>
         );
     }
 
     return (
-        <div style={{ padding: '30px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#fdfdfd' }}>
+        <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', background: '#fcfcfc', minHeight: '100vh' }}>
             {toast.show && (
-                <div style={{ position: 'fixed', top: '20px', right: '20px', padding: '15px 25px', background: toast.type === 'success' ? '#4caf50' : '#f44336', color: '#fff', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 1000, animation: 'slideIn 0.3s ease-out' }}>
+                <div style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', background: toast.type === 'success' ? '#2e7d32' : '#c62828', color: '#fff', padding: '12px 30px', borderRadius: '50px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', zIndex: 1000, fontWeight: 600, animation: 'popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
                     {toast.message}
-                    <style>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+                    <style>{`@keyframes popIn { 0% { bottom: -50px; opacity: 0; } 100% { bottom: 30px; opacity: 1; } }`}</style>
                 </div>
             )}
 
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '2rem' }}>⚡</span>
-                    <h1 style={{ margin: 0, letterSpacing: '-1px' }}>CryptoTick <span style={{ color: '#2196f3' }}>Analytics</span></h1>
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>CRYPTOTICK <span style={{ color: '#2196f3' }}>HUB</span></h1>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.9rem', color: '#888' }}>{user.signInDetails?.loginId}</span>
+                    <button onClick={signOut} style={{ padding: '8px 20px', border: '1px solid #eee', background: '#fff', borderRadius: '8px', cursor: 'pointer' }}>LOGOUT</button>
                 </div>
-                <button onClick={signOut} style={{ padding: '10px 20px', background: '#fff', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Sign Out</button>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '30px' }}>
-                <aside style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div style={{ background: '#fff', padding: '25px', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: '1px solid #eee' }}>
-                        <h3 style={{ marginTop: 0, marginBottom: '20px' }}>Control Panel</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '40px' }}>
+                <aside style={{ background: '#fff', padding: '30px', borderRadius: '24px', border: '1px solid #f0f0f0', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '25px' }}>Terminal Config</h3>
 
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#888', marginBottom: '8px' }}>VOLATILITY THRESHOLD (%)</label>
-                        <input type="number" step="0.0001" value={threshold} onChange={(e) => setThreshold(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '25px', borderRadius: '8px', border: '1px solid #eee', boxSizing: 'border-box' }} />
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#bbb', display: 'block', marginBottom: '10px' }}>ALERT THRESHOLD (%)</label>
+                    <input type="number" step="0.0001" value={threshold} onChange={(e) => setThreshold(e.target.value)} style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #eee', marginBottom: '30px', fontSize: '1rem' }} />
 
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#888', marginBottom: '12px' }}>WATCHLIST (SELECT 20)</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '250px', overflowY: 'auto', padding: '5px' }}>
-                            {AVAILABLE_SYMBOLS.map(sym => (
-                                <button key={sym} onClick={() => toggleSymbol(sym)} style={{ padding: '6px 12px', borderRadius: '20px', border: '1px solid', borderColor: selectedSymbols.includes(sym) ? '#2196f3' : '#eee', background: selectedSymbols.includes(sym) ? '#e3f2fd' : '#fff', color: selectedSymbols.includes(sym) ? '#2196f3' : '#666', fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.2s' }}>
-                                    {sym.replace("USDT", "")}
-                                </button>
-                            ))}
-                        </div>
-
-                        <button onClick={saveSettings} style={{ width: '100%', padding: '14px', background: '#2196f3', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', marginTop: '25px', boxShadow: '0 4px 10px rgba(33, 150, 243, 0.3)' }}>Sync Preferences</button>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#bbb', display: 'block', marginBottom: '15px' }}>ACTIVE WATCHLIST</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                        {AVAILABLE_SYMBOLS.map(sym => (
+                            <button key={sym} onClick={() => toggleSymbol(sym)} style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: selectedSymbols.includes(sym) ? '#2196f3' : '#f5f5f5', color: selectedSymbols.includes(sym) ? '#fff' : '#666', fontSize: '0.8rem', cursor: 'pointer', transition: '0.2s' }}>
+                                {sym.replace("USDT", "")}
+                            </button>
+                        ))}
                     </div>
+
+                    <button onClick={saveSettings} style={{ width: '100%', padding: '16px', background: '#000', color: '#fff', border: 'none', borderRadius: '14px', marginTop: '35px', fontWeight: 700, cursor: 'pointer', letterSpacing: '1px' }}>SYNC TO CLOUD</button>
                 </aside>
 
-                <main style={{ background: '#fff', padding: '25px', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: '1px solid #eee', minHeight: '500px' }}>
-                    <h3 style={{ marginTop: 0 }}>Price Volatility Index</h3>
-                    {chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={400}>
-                            <LineChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
-                                <XAxis dataKey="time" fontSize={11} tickMargin={10} />
-                                <YAxis domain={['auto', 'auto']} fontSize={11} />
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 5px 15px rgba(0,0,0,0.1)' }} />
-                                <Legend />
-                                <Line name="Market Price" type="stepAfter" dataKey="price" stroke="#2196f3" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6 }} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div style={{ height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#ccc', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '3rem', marginBottom: '10px' }}>📊</span>
-                            <p>No volatility events detected for selected symbols yet.</p>
-                        </div>
-                    )}
+                <main style={{ background: '#fff', padding: '30px', borderRadius: '24px', border: '1px solid #f0f0f0', minHeight: '600px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+                        <h3 style={{ margin: 0 }}>Market Trajectory</h3>
+                        <div style={{ fontSize: '0.8rem', color: '#4caf50', fontWeight: 700 }}>● LIVE FEED ACTIVE</div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={500}>
+                        <LineChart data={chartData}>
+                            <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="#f9f9f9" />
+                            <XAxis dataKey="time" fontSize={10} axisLine={false} tickLine={false} />
+                            <YAxis domain={['auto', 'auto']} fontSize={10} axisLine={false} tickLine={false} orientation="right" />
+                            <Tooltip contentStyle={{ borderRadius: '15px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+                            <Legend verticalAlign="top" align="right" height={36}/>
+                            <Line name="Price Movement" type="monotone" dataKey="price" stroke="#2196f3" strokeWidth={4} dot={{ r: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} animationDuration={1500} />
+                        </LineChart>
+                    </ResponsiveContainer>
                 </main>
             </div>
 
-            <section style={{ marginTop: '40px' }}>
-                <h3 style={{ marginBottom: '20px' }}>Live Activity Stream</h3>
-                <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #eee', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+            <section style={{ marginTop: '60px' }}>
+                <h3 style={{ marginBottom: '30px', letterSpacing: '-0.5px' }}>Historical Activity Stream</h3>
+                <div style={{ background: '#fff', borderRadius: '24px', border: '1px solid #f0f0f0', overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead style={{ background: '#fcfcfc' }}>
-                        <tr style={{ textAlign: 'left' }}>
-                            <th style={{ padding: '20px', color: '#888', fontSize: '0.8rem' }}>ASSET</th>
-                            <th style={{ padding: '20px', color: '#888', fontSize: '0.8rem' }}>VOLATILITY SHIFT</th>
-                            <th style={{ padding: '20px', color: '#888', fontSize: '0.8rem' }}>CURRENT</th>
-                            <th style={{ padding: '20px', color: '#888', fontSize: '0.8rem' }}>TIMESTAMP</th>
+                        <thead>
+                        <tr style={{ background: '#fafafa', textAlign: 'left' }}>
+                            <th style={{ padding: '25px', fontSize: '0.7rem', color: '#aaa' }}>ASSET</th>
+                            <th style={{ padding: '25px', fontSize: '0.7rem', color: '#aaa' }}>DELTA SHIFT</th>
+                            <th style={{ padding: '25px', fontSize: '0.7rem', color: '#aaa' }}>VALUATION</th>
+                            <th style={{ padding: '25px', fontSize: '0.7rem', color: '#aaa' }}>UTC TIMESTAMP</th>
                         </tr>
                         </thead>
                         <tbody>
                         {alerts.map((alert, index) => {
                             const diff = parseFloat(alert.price) - parseFloat(alert.oldPrice);
-                            const pct = ((diff / parseFloat(alert.oldPrice)) * 100).toFixed(3);
+                            const pct = ((diff / parseFloat(alert.oldPrice)) * 100).toFixed(4);
                             return (
-                                <tr key={index} style={{ borderTop: '1px solid #eee' }}>
-                                    <td style={{ padding: '20px' }}><strong>{alert.symbol}</strong></td>
-                                    <td style={{ padding: '20px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: diff >= 0 ? '#4caf50' : '#f44336' }}>
-                                            <span>{diff >= 0 ? '↗' : '↘'}</span>
-                                            <span style={{ fontWeight: 700 }}>{pct}%</span>
-                                            <span style={{ fontSize: '0.8rem', color: '#aaa' }}>(${parseFloat(alert.oldPrice).toFixed(2)})</span>
+                                <tr key={index} style={{ borderBottom: '1px solid #f9f9f9' }}>
+                                    <td style={{ padding: '20px 25px' }}><strong>{alert.symbol}</strong></td>
+                                    <td style={{ padding: '20px 25px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: diff >= 0 ? '#4caf50' : '#f44336', fontWeight: 800 }}>
+                                            {diff >= 0 ? '▲' : '▼'} {pct}%
                                         </div>
                                     </td>
-                                    <td style={{ padding: '20px', fontWeight: 600 }}>${parseFloat(alert.price).toLocaleString()}</td>
-                                    <td style={{ padding: '20px', color: '#aaa', fontSize: '0.85rem' }}>{new Date(parseInt(alert.timestamp)).toLocaleString()}</td>
+                                    <td style={{ padding: '20px 25px', fontWeight: 600 }}>${parseFloat(alert.price).toLocaleString()}</td>
+                                    <td style={{ padding: '20px 25px', color: '#ccc', fontSize: '0.8rem' }}>{new Date(parseInt(alert.timestamp)).toLocaleString()}</td>
                                 </tr>
                             );
                         })}
@@ -183,12 +177,12 @@ function Dashboard({ signOut, user }) {
                 </div>
             </section>
 
-            <footer style={{ marginTop: '60px', padding: '40px 0', borderTop: '1px solid #eee', textAlign: 'center' }}>
-                <p style={{ margin: 0, color: '#999', fontSize: '0.9rem' }}>Built with AWS Serverless Architecture by <strong>Levan Natsvlishvili</strong></p>
-                <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'center', gap: '25px' }}>
-                    <a href="https://github.com/levanatsvlishvili/CryptoTick" style={{ color: '#2196f3', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600 }}>GitHub</a>
-                    <a href="https://www.linkedin.com/in/levan-natsvlishvili/" style={{ color: '#2196f3', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600 }}>LinkedIn</a>
+            <footer style={{ marginTop: '80px', padding: '40px 0', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', marginBottom: '20px' }}>
+                    <a href="https://github.com/levanatsvlishvili/CryptoTick" target="_blank" style={{ color: '#000', textDecoration: 'none', fontWeight: 700, fontSize: '0.8rem' }}>GITHUB</a>
+                    <a href="https://www.linkedin.com/in/levan-natsvlishvili/" target="_blank" style={{ color: '#000', textDecoration: 'none', fontWeight: 700, fontSize: '0.8rem' }}>LINKEDIN</a>
                 </div>
+                <p style={{ color: '#bbb', fontSize: '0.75rem' }}>ENGINEERED BY LEVAN NATSVLISHVILI • 2026</p>
             </footer>
         </div>
     );

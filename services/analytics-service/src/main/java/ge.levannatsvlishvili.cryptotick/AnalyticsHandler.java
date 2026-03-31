@@ -37,24 +37,23 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                 double currentPrice = root.get("price").asDouble();
                 String symbol = root.get("symbol").asText();
 
-                if (!lastPrices.containsKey(symbol)) {
-                    lastPrices.put(symbol, currentPrice);
-                    continue;
-                }
-
-                double previousPrice = lastPrices.get(symbol);
+                double previousPrice = lastPrices.getOrDefault(symbol, currentPrice);
                 double change = Math.abs(currentPrice - previousPrice) / previousPrice;
 
                 for (Map<String, AttributeValue> userPref : allUserSettings) {
                     String userId = userPref.get("userId").s();
                     double threshold = Double.parseDouble(userPref.get("threshold").n());
                     String trackedSymbolsStr = userPref.get("trackedSymbols") != null ? userPref.get("trackedSymbols").s() : "";
-
                     List<String> trackedList = Arrays.asList(trackedSymbolsStr.split("\\s*,\\s*"));
 
                     if (trackedSymbolsStr.isEmpty() || trackedList.contains(symbol)) {
-                        if (change >= threshold) {
-                            processAlert(symbol, currentPrice, previousPrice, threshold, userId, context);
+                        // გრაფიკისთვის ყოველთვის ვინახავთ (რომ აპლიკაცია "სუნთქავდეს")
+                        saveToDynamo(symbol, currentPrice, previousPrice, userId);
+
+                        // SNS-ს ვუშვებთ მხოლოდ მაშინ, თუ რეალური ვოლატილობაა
+                        if (change >= threshold && currentPrice != previousPrice) {
+                            sendSnsNotification(symbol, currentPrice, threshold);
+                            context.getLogger().log("!!! SNS Alert for " + userId + " on " + symbol);
                         }
                     }
                 }
@@ -66,12 +65,6 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
         return "Success";
     }
 
-    private void processAlert(String symbol, double price, double oldPrice, double threshold, String userId, Context context) {
-        saveToDynamo(symbol, price, oldPrice, userId);
-        sendSnsNotification(symbol, price, threshold);
-        context.getLogger().log("!!! ALERT saved for " + userId + " on " + symbol);
-    }
-
     private void saveToDynamo(String symbol, double price, double oldPrice, String userId) {
         dynamoDb.putItem(PutItemRequest.builder()
                 .tableName(ALERTS_TABLE)
@@ -80,8 +73,7 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                         "symbol", AttributeValue.builder().s(symbol).build(),
                         "timestamp", AttributeValue.builder().n(String.valueOf(System.currentTimeMillis())).build(),
                         "price", AttributeValue.builder().n(String.valueOf(price)).build(),
-                        "oldPrice", AttributeValue.builder().n(String.valueOf(oldPrice)).build(),
-                        "type", AttributeValue.builder().s("DYNAMIC_VOLATILITY_ALERT").build()
+                        "oldPrice", AttributeValue.builder().n(String.valueOf(oldPrice)).build()
                 ))
                 .build());
     }

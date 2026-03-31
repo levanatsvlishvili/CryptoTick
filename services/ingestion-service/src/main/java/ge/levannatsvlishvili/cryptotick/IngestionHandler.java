@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +22,12 @@ public class IngestionHandler implements RequestHandler<Object, String> {
     private final String queueUrl = System.getenv("QUEUE_URL");
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper mapper = new ObjectMapper();
+
+    private final List<String> targetSymbols = Arrays.asList(
+            "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOTUSDT",
+            "DOGEUSDT", "LINKUSDT", "MATICUSDT", "SHIBUSDT", "LTCUSDT", "TRXUSDT", "BCHUSDT",
+            "UNIUSDT", "NEARUSDT", "APTUSDT", "OPUSDT", "ARBUSDT"
+    );
 
     @Override
     public String handleRequest(Object input, Context context) {
@@ -33,30 +40,26 @@ public class IngestionHandler implements RequestHandler<Object, String> {
             JsonNode allTickers = mapper.readTree(response.body());
 
             List<SendMessageBatchRequestEntry> entries = new ArrayList<>();
-            int count = 0;
 
             for (JsonNode ticker : allTickers) {
                 String symbol = ticker.get("symbol").asText();
-                if (symbol.endsWith("USDT") && count < 20) {
+                if (targetSymbols.contains(symbol)) {
                     entries.add(SendMessageBatchRequestEntry.builder()
                             .id(UUID.randomUUID().toString())
                             .messageBody(ticker.toString())
                             .build());
-                    count++;
                 }
             }
 
             for (int i = 0; i < entries.size(); i += 10) {
                 int toIndex = Math.min(i + 10, entries.size());
-                List<SendMessageBatchRequestEntry> batch = entries.subList(i, toIndex);
-
                 sqsClient.sendMessageBatch(SendMessageBatchRequest.builder()
                         .queueUrl(queueUrl)
-                        .entries(batch)
+                        .entries(entries.subList(i, toIndex))
                         .build());
             }
 
-            return "Successfully ingested " + count + " symbols in batches of 10";
+            return "Ingested " + entries.size() + " target symbols";
         } catch (Exception e) {
             context.getLogger().log("Ingestion Error: " + e.getMessage());
             return "Failed";
