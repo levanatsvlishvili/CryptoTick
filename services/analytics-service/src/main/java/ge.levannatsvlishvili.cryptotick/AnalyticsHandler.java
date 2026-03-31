@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,16 +37,23 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                 double currentPrice = root.get("price").asDouble();
                 String symbol = root.get("symbol").asText();
 
-                double previousPrice = lastPrices.getOrDefault(symbol, currentPrice);
+                if (!lastPrices.containsKey(symbol)) {
+                    lastPrices.put(symbol, currentPrice);
+                    continue;
+                }
+
+                double previousPrice = lastPrices.get(symbol);
+                double change = Math.abs(currentPrice - previousPrice) / previousPrice;
 
                 for (Map<String, AttributeValue> userPref : allUserSettings) {
                     String userId = userPref.get("userId").s();
                     double threshold = Double.parseDouble(userPref.get("threshold").n());
-                    String trackedSymbols = userPref.get("trackedSymbols") != null ? userPref.get("trackedSymbols").s() : "";
+                    String trackedSymbolsStr = userPref.get("trackedSymbols") != null ? userPref.get("trackedSymbols").s() : "";
 
-                    if (trackedSymbols.contains(symbol) || trackedSymbols.isEmpty()) {
-                        double change = Math.abs(currentPrice - previousPrice) / previousPrice;
-                        if (change >= threshold && currentPrice != previousPrice) {
+                    List<String> trackedList = Arrays.asList(trackedSymbolsStr.split("\\s*,\\s*"));
+
+                    if (trackedSymbolsStr.isEmpty() || trackedList.contains(symbol)) {
+                        if (change >= threshold) {
                             processAlert(symbol, currentPrice, previousPrice, threshold, userId, context);
                         }
                     }
@@ -61,7 +69,7 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
     private void processAlert(String symbol, double price, double oldPrice, double threshold, String userId, Context context) {
         saveToDynamo(symbol, price, oldPrice, userId);
         sendSnsNotification(symbol, price, threshold);
-        context.getLogger().log("Alert for user " + userId + ": " + symbol);
+        context.getLogger().log("!!! ALERT saved for " + userId + " on " + symbol);
     }
 
     private void saveToDynamo(String symbol, double price, double oldPrice, String userId) {

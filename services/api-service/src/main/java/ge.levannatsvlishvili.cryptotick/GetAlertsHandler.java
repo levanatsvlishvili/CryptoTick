@@ -39,12 +39,10 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
     }
 
     private APIGatewayProxyResponseEvent handleGetAlerts(String userId) throws Exception {
-        Map<String, AttributeValue> expressionValues = Map.of(":v1", AttributeValue.builder().s(userId).build());
-
         ScanResponse response = dynamoDb.scan(ScanRequest.builder()
                 .tableName(ALERTS_TABLE)
-                .filterExpression("userId = :v1")
-                .expressionAttributeValues(expressionValues)
+                .filterExpression("userId = :uid")
+                .expressionAttributeValues(Map.of(":uid", AttributeValue.builder().s(userId).build()))
                 .build());
 
         List<Map<String, String>> alerts = response.items().stream()
@@ -53,8 +51,8 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
                     item.forEach((k, v) -> map.put(k, v.s() != null ? v.s() : v.n()));
                     return map;
                 })
-                .sorted((a, b) -> b.get("timestamp").compareTo(a.get("timestamp")))
-                .limit(20)
+                .sorted((a, b) -> Long.compare(Long.parseLong(b.get("timestamp")), Long.parseLong(a.get("timestamp"))))
+                .limit(30)
                 .collect(Collectors.toList());
 
         return createResponse(200, mapper.writeValueAsString(alerts));
