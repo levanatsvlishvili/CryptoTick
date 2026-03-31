@@ -181,5 +181,9 @@ public class InfraStack extends Stack {
         CfnOutput.Builder.create(this, "DistributionId")
                 .value(distribution.getDistributionId())
                 .build();
+
+        CfnOutput.Builder.create(this, "ApiUrl")
+                .value(api.getUrl())
+                .build();
     }
 }

@@ -45,11 +45,17 @@ jobs:
       - name: Build Frontend
         working-directory: frontend
         run: |
-          VITE_URL=$(jq -r '.InfraStack.CryptoTickApiEndpointXXXXX' ../infra/outputs.json)
+          VITE_URL=$(jq -r '.InfraStack.ApiUrl' ../infra/outputs.json)
+          if [ "$VITE_URL" == "null" ] || [ -z "$VITE_URL" ]; then
+            echo "JQ failed to find ApiUrl, using fallback..."
+            VITE_URL="https://up5jue5r2l.execute-api.eu-central-1.amazonaws.com/prod/"
+          fi
           echo "VITE_API_URL=$VITE_URL" > .env
+          echo "Generated .env content:"
+          cat .env
+          
           npm install
           npm run build
-
       - name: Deploy to S3
         run: |
           aws s3 sync frontend/dist s3://cryptotick-frontend-007400345180 --delete
