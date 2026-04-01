@@ -27,11 +27,8 @@ function Dashboard({ signOut, user }) {
             const response = await fetch(API_URL, { headers: { 'Authorization': token } });
             const data = await response.json();
             setAlerts(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) { console.error(err); }
+        finally { setLoading(false); }
     };
 
     const saveSettings = async () => {
@@ -48,9 +45,7 @@ function Dashboard({ signOut, user }) {
             });
             setToast("CLOUD SYNC COMPLETE");
             setTimeout(() => setToast(null), 3000);
-        } catch (err) {
-            console.error(err);
-        }
+        } catch (err) { console.error(err); }
     };
 
     useEffect(() => {
@@ -65,6 +60,13 @@ function Dashboard({ signOut, user }) {
         );
     };
 
+    const adjustThreshold = (val) => {
+        setThreshold(prev => {
+            const newVal = (parseFloat(prev || 0) + val).toFixed(4);
+            return newVal >= 0 ? newVal : 0;
+        });
+    };
+
     const filteredAlerts = activeTab === 'ALL'
         ? alerts
         : alerts.filter(a => a.symbol === activeTab);
@@ -74,67 +76,71 @@ function Dashboard({ signOut, user }) {
         price: parseFloat(a.price)
     }));
 
-    if (loading) return (
-        <div className="loading-screen">
-            <div className="loader-ring"></div>
-            <Text color="var(--text-muted)" letterSpacing="4px" fontSize="11px" fontWeight="900">AUTHENTICATING SESSION</Text>
-        </div>
-    );
+    if (loading) return <div className="loading-screen"><Text color="var(--text-muted)" letterSpacing="4px" fontSize="11px" fontWeight="900">NODE INITIALIZATION</Text></div>;
 
     return (
         <div className="app-layout">
             {toast && <div className="toast">{toast}</div>}
 
             <aside className="sidebar">
-                <div className="sidebar-section">
-                    <span className="sidebar-label">Identity Node</span>
-                    <div className="user-box">
-                        <div className="user-email-label">ACTIVE OPERATOR</div>
-                        <div className="user-email-value">{user.signInDetails?.loginId}</div>
+                <div className="sidebar-content">
+                    <div className="sidebar-section">
+                        <div className="user-box">
+                            <div className="user-email-value">{user.signInDetails?.loginId}</div>
+                            <button className="btn-logout" onClick={signOut}>LOG OUT</button>
+                        </div>
+                    </div>
+
+                    <div className="sidebar-section">
+                        <span className="sidebar-label">Alert Sensitivity</span>
+                        <div className="threshold-control">
+                            <button className="threshold-btn" onClick={() => adjustThreshold(-0.0001)}>−</button>
+                            <input
+                                type="number"
+                                step="0.0001"
+                                className="input-terminal"
+                                value={threshold}
+                                onChange={(e) => setThreshold(e.target.value)}
+                            />
+                            <button className="threshold-btn" onClick={() => adjustThreshold(0.0001)}>+</button>
+                        </div>
+                    </div>
+
+                    <div className="sidebar-section">
+                        <span className="sidebar-label">Watchlist Mapping</span>
+                        <div className="symbol-grid">
+                            {SYMBOLS.map(sym => (
+                                <button
+                                    key={sym}
+                                    className={`symbol-btn ${selectedSymbols.includes(sym) ? 'active' : ''}`}
+                                    onClick={() => toggleSymbol(sym)}
+                                >
+                                    {sym.replace('USDT', '')}
+                                </button>
+                            ))}
+                        </div>
+                        <button className="btn-primary" style={{ marginTop: '24px' }} onClick={saveSettings}>
+                            APPLY CONFIG
+                        </button>
                     </div>
                 </div>
 
-                <div className="sidebar-section">
-                    <span className="sidebar-label">Alert Sensitivity</span>
-                    <input
-                        type="number"
-                        step="0.0001"
-                        className="input-terminal"
-                        value={threshold}
-                        onChange={(e) => setThreshold(e.target.value)}
-                    />
-                </div>
-
-                <div className="sidebar-section" style={{ flexGrow: 1 }}>
-                    <span className="sidebar-label">Asset Watchlist</span>
-                    <div className="symbol-grid">
-                        {SYMBOLS.map(sym => (
-                            <button
-                                key={sym}
-                                className={`symbol-btn ${selectedSymbols.includes(sym) ? 'active' : ''}`}
-                                onClick={() => toggleSymbol(sym)}
-                            >
-                                {sym.replace('USDT', '')}
-                            </button>
-                        ))}
+                <div className="sidebar-footer">
+                    <span className="author-name">LEVAN NATSVLISHVILI</span>
+                    <div className="social-links">
+                        <a href="https://github.com/levanatsvlishvili/CryptoTick" target="_blank" className="social-link">GITHUB</a>
+                        <a href="https://www.linkedin.com/in/levan-natsvlishvili/" target="_blank" className="social-link">LINKEDIN</a>
                     </div>
-                    <button className="btn-primary" style={{ marginTop: '24px' }} onClick={saveSettings}>
-                        SYNC PREFERENCES
-                    </button>
                 </div>
-
-                <button className="btn-logout" onClick={signOut}>TERMINATE CONNECTION</button>
             </aside>
 
             <main className="main-content">
-                <header style={{ marginBottom: '40px' }}>
-                    <Heading level={2} fontWeight={800} letterSpacing="-1px">
-                        CRYPTOTICK <span style={{ color: 'var(--accent)' }}>HUB</span>
-                    </Heading>
+                <header style={{ marginBottom: '30px' }}>
+                    <Heading level={2} fontWeight={800} color="var(--accent)">CRYPTOTICK HUB</Heading>
                 </header>
 
                 <nav className="tab-nav">
-                    <button className={`tab-link ${activeTab === 'ALL' ? 'active' : ''}`} onClick={() => setActiveTab('ALL')}>Aggregate Data</button>
+                    <button className={`tab-link ${activeTab === 'ALL' ? 'active' : ''}`} onClick={() => setActiveTab('ALL')}>Aggregate</button>
                     {selectedSymbols.map(sym => (
                         <button key={sym} className={`tab-link ${activeTab === sym ? 'active' : ''}`} onClick={() => setActiveTab(sym)}>
                             {sym.replace('USDT', '')}
@@ -142,10 +148,10 @@ function Dashboard({ signOut, user }) {
                     ))}
                 </nav>
 
-                <div className="card" style={{ height: '480px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
-                        <Text fontWeight={700} fontSize="14px">MARKET TRAJECTORY: {activeTab}</Text>
-                        <Text color="var(--success)" fontSize="12px" fontWeight={800}>● LIVE TELEMETRY</Text>
+                <div className="card" style={{ height: '440px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>TRAJECTORY: {activeTab}</span>
+                        <Text color="var(--success)" fontSize="11px" fontWeight={800}>● LIVE TELEMETRY</Text>
                     </div>
                     <ResponsiveContainer width="100%" height="90%">
                         <AreaChart data={chartData}>
@@ -156,9 +162,9 @@ function Dashboard({ signOut, user }) {
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#2b2f36" vertical={false} />
-                            <XAxis dataKey="time" stroke="var(--text-muted)" fontSize={10} axisLine={false} tickLine={false} tickMargin={12} />
+                            <XAxis dataKey="time" stroke="var(--text-muted)" fontSize={10} axisLine={false} tickLine={false} />
                             <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={10} axisLine={false} tickLine={false} orientation="right" />
-                            <Tooltip contentStyle={{ background: '#1e2026', border: '1px solid #2b2f36', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }} />
+                            <Tooltip contentStyle={{ background: '#1e2026', border: '1px solid #2b2f36', borderRadius: '12px' }} />
                             <Area type="monotone" dataKey="price" stroke="var(--accent)" strokeWidth={3} fill="url(#areaGrad)" animationDuration={1000} />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -167,19 +173,17 @@ function Dashboard({ signOut, user }) {
                 <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
                     <table className="data-table">
                         <thead>
-                        <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
-                            <th>Asset</th>
-                            <th>Price Transition</th>
-                            <th>Delta</th>
-                            <th>System Time</th>
+                        <tr style={{ background: 'rgba(255,255,255,0.01)' }}>
+                            <th className="col-asset">Asset</th>
+                            <th className="col-transition">Price Transition</th>
+                            <th className="col-delta">Delta</th>
+                            <th className="col-time">Timestamp</th>
                         </tr>
                         </thead>
                         <tbody>
                         {filteredAlerts.map((alert, index) => {
                             const diff = parseFloat(alert.price) - parseFloat(alert.oldPrice);
                             const pct = ((diff / parseFloat(alert.oldPrice)) * 100).toFixed(4);
-                            if (parseFloat(pct) === 0 && alerts.length > 1) return null;
-
                             return (
                                 <tr key={index}>
                                     <td style={{ fontWeight: 800 }}>{alert.symbol.replace('USDT', '')}</td>
@@ -191,7 +195,7 @@ function Dashboard({ signOut, user }) {
                                     <td style={{ color: diff >= 0 ? 'var(--success)' : 'var(--error)', fontWeight: 800 }}>
                                         {diff >= 0 ? '▲' : '▼'} {Math.abs(pct)}%
                                     </td>
-                                    <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{new Date(parseInt(alert.timestamp)).toLocaleTimeString()}</td>
+                                    <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{new Date(parseInt(alert.timestamp)).toLocaleTimeString()}</td>
                                 </tr>
                             );
                         })}
@@ -203,20 +207,18 @@ function Dashboard({ signOut, user }) {
     );
 }
 
-const authConfig = {
-    Header() {
-        return (
-            <View textAlign="center" padding="xl">
-                <Heading level={2} color="var(--accent)" fontWeight={800}>CRYPTOTICK</Heading>
-                <Text color="var(--text-muted)" fontSize="14px">Secure Market Intelligence Terminal</Text>
-            </View>
-        );
-    }
-};
-
 export default function App() {
     return (
-        <Authenticator components={authConfig}>
+        <Authenticator components={{
+            Header() {
+                return (
+                    <View textAlign="center" padding="xl">
+                        <Heading level={2} color="var(--accent)" fontWeight={800}>CRYPTOTICK</Heading>
+                        <Text color="var(--text-muted)" fontSize="14px">Secure Market Intelligence Terminal</Text>
+                    </View>
+                );
+            }
+        }}>
             {({ signOut, user }) => <Dashboard signOut={signOut} user={user} />}
         </Authenticator>
     );
