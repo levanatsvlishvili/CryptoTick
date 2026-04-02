@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Authenticator, View, Text, Heading } from '@aws-amplify/ui-react';
+import { Authenticator, View, Text, Heading, Button } from '@aws-amplify/ui-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import '@aws-amplify/ui-react/styles.css';
@@ -92,13 +92,8 @@ function Dashboard({ signOut, user }) {
     const processedData = useMemo(() => {
         const now = Date.now();
         const cutoff = now - TIME_RANGES[timeRange];
-
         let filtered = alerts.filter(a => parseInt(a.timestamp) >= cutoff);
-
-        if (activeTab !== 'ALL') {
-            filtered = filtered.filter(a => a.symbol === activeTab);
-        }
-
+        if (activeTab !== 'ALL') filtered = filtered.filter(a => a.symbol === activeTab);
         return filtered;
     }, [alerts, timeRange, activeTab]);
 
@@ -112,12 +107,16 @@ function Dashboard({ signOut, user }) {
         return processedData.slice(start, start + pageSize);
     }, [processedData, currentPage]);
 
-    if (loading) return <div className="loading-screen"><Text color="var(--text-muted)" letterSpacing="4px" fontSize="11px" fontWeight="900">NODE INITIALIZATION</Text></div>;
+    if (loading) return (
+        <div className="loading-screen">
+            <div className="loader-ring"></div>
+            <Text color="var(--text-muted)" letterSpacing="4px" fontSize="11px" fontWeight="900">NODE INITIALIZATION</Text>
+        </div>
+    );
 
     return (
         <div className="app-layout">
             {toast && <div className="toast">{toast}</div>}
-
             <aside className="sidebar">
                 <div className="sidebar-content">
                     <div className="sidebar-section">
@@ -127,41 +126,26 @@ function Dashboard({ signOut, user }) {
                             <button className="btn-logout" onClick={signOut}>LOG OUT</button>
                         </div>
                     </div>
-
                     <div className="sidebar-section">
                         <span className="sidebar-label">Alert Sensitivity</span>
                         <div className="threshold-control">
                             <button className="threshold-btn" onClick={() => adjustThreshold(-0.0001)}>−</button>
-                            <input
-                                type="number"
-                                step="0.0001"
-                                className="input-terminal"
-                                value={threshold}
-                                onChange={(e) => setThreshold(e.target.value)}
-                            />
+                            <input type="number" step="0.0001" className="input-terminal" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
                             <button className="threshold-btn" onClick={() => adjustThreshold(0.0001)}>+</button>
                         </div>
                     </div>
-
                     <div className="sidebar-section">
                         <span className="sidebar-label">Watchlist Mapping</span>
                         <div className="symbol-grid">
                             {SYMBOLS.map(sym => (
-                                <button
-                                    key={sym}
-                                    className={`symbol-btn ${selectedSymbols.includes(sym) ? 'active' : ''}`}
-                                    onClick={() => toggleSymbol(sym)}
-                                >
+                                <button key={sym} className={`symbol-btn ${selectedSymbols.includes(sym) ? 'active' : ''}`} onClick={() => toggleSymbol(sym)}>
                                     {sym.replace('USDT', '')}
                                 </button>
                             ))}
                         </div>
-                        <button className="btn-primary" style={{ marginTop: '24px' }} onClick={saveSettings}>
-                            APPLY CONFIG
-                        </button>
+                        <button className="btn-primary" style={{ marginTop: '24px' }} onClick={saveSettings}>APPLY CONFIG</button>
                     </div>
                 </div>
-
                 <div className="sidebar-footer">
                     <span className="author-name">LEVAN NATSVLISHVILI</span>
                     <div className="social-links">
@@ -170,32 +154,21 @@ function Dashboard({ signOut, user }) {
                     </div>
                 </div>
             </aside>
-
             <main className="main-content">
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                     <Heading level={2} fontWeight={800} color="var(--accent)">CRYPTOTICK HUB</Heading>
                     <div className="range-picker">
                         {Object.keys(TIME_RANGES).map(range => (
-                            <button
-                                key={range}
-                                className={`range-btn ${timeRange === range ? 'active' : ''}`}
-                                onClick={() => { setTimeRange(range); setCurrentPage(1); }}
-                            >
-                                {range}
-                            </button>
+                            <button key={range} className={`range-btn ${timeRange === range ? 'active' : ''}`} onClick={() => { setTimeRange(range); setCurrentPage(1); }}>{range}</button>
                         ))}
                     </div>
                 </header>
-
                 <nav className="tab-nav">
                     <button className={`tab-link ${activeTab === 'ALL' ? 'active' : ''}`} onClick={() => { setActiveTab('ALL'); setCurrentPage(1); }}>Aggregate</button>
                     {selectedSymbols.map(sym => (
-                        <button key={sym} className={`tab-link ${activeTab === sym ? 'active' : ''}`} onClick={() => { setActiveTab(sym); setCurrentPage(1); }}>
-                            {sym.replace('USDT', '')}
-                        </button>
+                        <button key={sym} className={`tab-link ${activeTab === sym ? 'active' : ''}`} onClick={() => { setActiveTab(sym); setCurrentPage(1); }}>{sym.replace('USDT', '')}</button>
                     ))}
                 </nav>
-
                 <div className="card" style={{ height: '440px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                         <span style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>TRAJECTORY: {activeTab} ({timeRange})</span>
@@ -217,7 +190,6 @@ function Dashboard({ signOut, user }) {
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
-
                 <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
                     <table className="data-table">
                         <thead>
@@ -240,9 +212,7 @@ function Dashboard({ signOut, user }) {
                                         <span style={{ margin: '0 12px', color: 'var(--accent)', fontWeight: 900 }}>➔</span>
                                         <span style={{ fontWeight: 600 }}>${parseFloat(alert.price).toLocaleString()}</span>
                                     </td>
-                                    <td style={{ color: diff >= 0 ? 'var(--success)' : 'var(--error)', fontWeight: 800 }}>
-                                        {diff >= 0 ? '▲' : '▼'} {Math.abs(pct)}%
-                                    </td>
+                                    <td style={{ color: diff >= 0 ? 'var(--success)' : 'var(--error)', fontWeight: 800 }}>{diff >= 0 ? '▲' : '▼'} {Math.abs(pct)}%</td>
                                     <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{new Date(parseInt(alert.timestamp)).toLocaleString()}</td>
                                 </tr>
                             );
@@ -260,19 +230,61 @@ function Dashboard({ signOut, user }) {
     );
 }
 
+const authComponents = {
+    Header() {
+        return (
+            <View textAlign="center" padding="large">
+                <Heading level={2} color="var(--accent)" fontWeight={900} letterSpacing="-1px">CRYPTOTICK</Heading>
+            </View>
+        );
+    }
+};
+
 export default function App() {
     return (
-        <Authenticator components={{
-            Header() {
-                return (
-                    <View textAlign="center" padding="xl">
-                        <Heading level={2} color="var(--accent)" fontWeight={800}>CRYPTOTICK</Heading>
-                        <Text color="var(--text-muted)" fontSize="14px">Secure Market Intelligence Terminal</Text>
-                    </View>
-                );
-            }
-        }}>
-            {({ signOut, user }) => <Dashboard signOut={signOut} user={user} />}
+        <Authenticator components={authComponents}>
+            {({ signOut, user }) => (
+                <main>
+                    {!user ? (
+                        <div className="auth-landing">
+                            <div className="auth-info-side">
+                                <div className="info-content">
+                                    <Heading level={1}>Real-Time Market Surveillance</Heading>
+                                    <Text className="info-desc">Experience the next generation of event-driven cryptocurrency analytics. CryptoTick provides sub-second monitoring and personalized volatility intelligence.</Text>
+                                    <div className="feature-list">
+                                        <div className="feature-item">
+                                            <span className="feature-icon">⚡</span>
+                                            <div>
+                                                <Heading level={4}>Live Telemetry</Heading>
+                                                <Text>Direct integration with Binance API for real-time asset tracking.</Text>
+                                            </div>
+                                        </div>
+                                        <div className="feature-item">
+                                            <span className="feature-icon">☁️</span>
+                                            <div>
+                                                <Heading level={4}>Serverless Core</Heading>
+                                                <Text>Built on AWS Lambda and SQS for ultimate scalability and reliability.</Text>
+                                            </div>
+                                        </div>
+                                        <div className="feature-item">
+                                            <span className="feature-icon">🔔</span>
+                                            <div>
+                                                <Heading level={4}>Smart Alerts</Heading>
+                                                <Text>Custom volatility thresholds managed by asynchronous analytics engines.</Text>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="auth-form-side">
+                                <Authenticator components={authComponents} />
+                            </div>
+                        </div>
+                    ) : (
+                        <Dashboard signOut={signOut} user={user} />
+                    )}
+                </main>
+            )}
         </Authenticator>
     );
 }

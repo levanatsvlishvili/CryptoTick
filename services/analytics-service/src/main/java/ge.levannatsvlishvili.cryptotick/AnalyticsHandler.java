@@ -47,10 +47,8 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                     List<String> trackedList = Arrays.asList(trackedSymbolsStr.split("\\s*,\\s*"));
 
                     if (trackedSymbolsStr.isEmpty() || trackedList.contains(symbol)) {
-                        // გრაფიკისთვის ყოველთვის ვინახავთ (რომ აპლიკაცია "სუნთქავდეს")
                         saveToDynamo(symbol, currentPrice, previousPrice, userId);
 
-                        // SNS-ს ვუშვებთ მხოლოდ მაშინ, თუ რეალური ვოლატილობაა
                         if (change >= threshold && currentPrice != previousPrice) {
                             sendSnsNotification(symbol, currentPrice, threshold);
                             context.getLogger().log("!!! SNS Alert for " + userId + " on " + symbol);
