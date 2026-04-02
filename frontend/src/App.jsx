@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Authenticator, View, Text, Heading } from '@aws-amplify/ui-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -12,23 +12,43 @@ const SYMBOLS = [
     "MATICUSDT", "SHIBUSDT", "LTCUSDT", "TRXUSDT", "BCHUSDT", "UNIUSDT", "NEARUSDT", "APTUSDT", "OPUSDT", "ARBUSDT"
 ];
 
+const TIME_RANGES = {
+    "1H": 3600000,
+    "1D": 86400000,
+    "1W": 604800000,
+    "1M": 2592000000
+};
+
 function Dashboard({ signOut, user }) {
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('ALL');
     const [threshold, setThreshold] = useState(0.001);
     const [selectedSymbols, setSelectedSymbols] = useState(["BTCUSDT", "ETHUSDT"]);
+    const [timeRange, setTimeRange] = useState('1H');
+    const [currentPage, setCurrentPage] = useState(1);
     const [toast, setToast] = useState(null);
+    const pageSize = 8;
 
-    const getAlerts = async () => {
+    const getInitialData = async () => {
         try {
             const session = await fetchAuthSession();
             const token = session.tokens.idToken.toString();
             const response = await fetch(API_URL, { headers: { 'Authorization': token } });
             const data = await response.json();
-            setAlerts(data);
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
+
+            setAlerts(data.alerts || []);
+            if (data.settings) {
+                setThreshold(parseFloat(data.settings.threshold || 0.001));
+                if (data.settings.trackedSymbols) {
+                    setSelectedSymbols(data.settings.trackedSymbols.split(", "));
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const saveSettings = async () => {
@@ -43,14 +63,16 @@ function Dashboard({ signOut, user }) {
                     trackedSymbols: selectedSymbols.join(", ")
                 })
             });
-            setToast("CLOUD SYNC COMPLETE");
+            setToast("CLOUD CONFIG SYNCHRONIZED");
             setTimeout(() => setToast(null), 3000);
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     useEffect(() => {
-        getAlerts();
-        const interval = setInterval(getAlerts, 30000);
+        getInitialData();
+        const interval = setInterval(getInitialData, 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -67,14 +89,28 @@ function Dashboard({ signOut, user }) {
         });
     };
 
-    const filteredAlerts = activeTab === 'ALL'
-        ? alerts
-        : alerts.filter(a => a.symbol === activeTab);
+    const processedData = useMemo(() => {
+        const now = Date.now();
+        const cutoff = now - TIME_RANGES[timeRange];
 
-    const chartData = [...filteredAlerts].reverse().map(a => ({
+        let filtered = alerts.filter(a => parseInt(a.timestamp) >= cutoff);
+
+        if (activeTab !== 'ALL') {
+            filtered = filtered.filter(a => a.symbol === activeTab);
+        }
+
+        return filtered;
+    }, [alerts, timeRange, activeTab]);
+
+    const chartData = [...processedData].reverse().map(a => ({
         time: new Date(parseInt(a.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         price: parseFloat(a.price)
     }));
+
+    const paginatedAlerts = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return processedData.slice(start, start + pageSize);
+    }, [processedData, currentPage]);
 
     if (loading) return <div className="loading-screen"><Text color="var(--text-muted)" letterSpacing="4px" fontSize="11px" fontWeight="900">NODE INITIALIZATION</Text></div>;
 
@@ -85,6 +121,7 @@ function Dashboard({ signOut, user }) {
             <aside className="sidebar">
                 <div className="sidebar-content">
                     <div className="sidebar-section">
+                        <span className="sidebar-label">Identity Node</span>
                         <div className="user-box">
                             <div className="user-email-value">{user.signInDetails?.loginId}</div>
                             <button className="btn-logout" onClick={signOut}>LOG OUT</button>
@@ -135,14 +172,25 @@ function Dashboard({ signOut, user }) {
             </aside>
 
             <main className="main-content">
-                <header style={{ marginBottom: '30px' }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                     <Heading level={2} fontWeight={800} color="var(--accent)">CRYPTOTICK HUB</Heading>
+                    <div className="range-picker">
+                        {Object.keys(TIME_RANGES).map(range => (
+                            <button
+                                key={range}
+                                className={`range-btn ${timeRange === range ? 'active' : ''}`}
+                                onClick={() => { setTimeRange(range); setCurrentPage(1); }}
+                            >
+                                {range}
+                            </button>
+                        ))}
+                    </div>
                 </header>
 
                 <nav className="tab-nav">
-                    <button className={`tab-link ${activeTab === 'ALL' ? 'active' : ''}`} onClick={() => setActiveTab('ALL')}>Aggregate</button>
+                    <button className={`tab-link ${activeTab === 'ALL' ? 'active' : ''}`} onClick={() => { setActiveTab('ALL'); setCurrentPage(1); }}>Aggregate</button>
                     {selectedSymbols.map(sym => (
-                        <button key={sym} className={`tab-link ${activeTab === sym ? 'active' : ''}`} onClick={() => setActiveTab(sym)}>
+                        <button key={sym} className={`tab-link ${activeTab === sym ? 'active' : ''}`} onClick={() => { setActiveTab(sym); setCurrentPage(1); }}>
                             {sym.replace('USDT', '')}
                         </button>
                     ))}
@@ -150,7 +198,7 @@ function Dashboard({ signOut, user }) {
 
                 <div className="card" style={{ height: '440px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>TRAJECTORY: {activeTab}</span>
+                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>TRAJECTORY: {activeTab} ({timeRange})</span>
                         <Text color="var(--success)" fontSize="11px" fontWeight={800}>● LIVE TELEMETRY</Text>
                     </div>
                     <ResponsiveContainer width="100%" height="90%">
@@ -181,7 +229,7 @@ function Dashboard({ signOut, user }) {
                         </tr>
                         </thead>
                         <tbody>
-                        {filteredAlerts.map((alert, index) => {
+                        {paginatedAlerts.map((alert, index) => {
                             const diff = parseFloat(alert.price) - parseFloat(alert.oldPrice);
                             const pct = ((diff / parseFloat(alert.oldPrice)) * 100).toFixed(4);
                             return (
@@ -195,12 +243,17 @@ function Dashboard({ signOut, user }) {
                                     <td style={{ color: diff >= 0 ? 'var(--success)' : 'var(--error)', fontWeight: 800 }}>
                                         {diff >= 0 ? '▲' : '▼'} {Math.abs(pct)}%
                                     </td>
-                                    <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{new Date(parseInt(alert.timestamp)).toLocaleTimeString()}</td>
+                                    <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{new Date(parseInt(alert.timestamp)).toLocaleString()}</td>
                                 </tr>
                             );
                         })}
                         </tbody>
                     </table>
+                    <div className="pagination">
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>PREV</button>
+                        <span>PAGE {currentPage}</span>
+                        <button disabled={paginatedAlerts.length < pageSize} onClick={() => setCurrentPage(prev => prev + 1)}>NEXT</button>
+                    </div>
                 </div>
             </main>
         </div>

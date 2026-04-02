@@ -4,7 +4,6 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
@@ -28,7 +27,7 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
 
             String method = input.getHttpMethod();
             if ("GET".equalsIgnoreCase(method)) {
-                return handleGetAlerts(userId);
+                return handleGetCombinedData(userId);
             } else if ("POST".equalsIgnoreCase(method)) {
                 return handleSaveSettings(input, userId, email);
             }
@@ -38,38 +37,49 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
         }
     }
 
-    private APIGatewayProxyResponseEvent handleGetAlerts(String userId) throws Exception {
-        ScanResponse response = dynamoDb.scan(ScanRequest.builder()
+    private APIGatewayProxyResponseEvent handleGetCombinedData(String userId) throws Exception {
+        GetItemResponse settingsResp = dynamoDb.getItem(GetItemRequest.builder()
+                .tableName(SETTINGS_TABLE)
+                .key(Map.of("userId", AttributeValue.builder().s(userId).build()))
+                .build());
+
+        Map<String, String> userSettings = new HashMap<>();
+        if (settingsResp.hasItem()) {
+            settingsResp.item().forEach((k, v) -> userSettings.put(k, v.s() != null ? v.s() : v.n()));
+        }
+
+        ScanResponse alertsResp = dynamoDb.scan(ScanRequest.builder()
                 .tableName(ALERTS_TABLE)
                 .filterExpression("userId = :uid")
                 .expressionAttributeValues(Map.of(":uid", AttributeValue.builder().s(userId).build()))
                 .build());
 
-        List<Map<String, String>> alerts = response.items().stream()
+        List<Map<String, String>> alerts = alertsResp.items().stream()
                 .map(item -> {
                     Map<String, String> map = new HashMap<>();
                     item.forEach((k, v) -> map.put(k, v.s() != null ? v.s() : v.n()));
                     return map;
                 })
                 .sorted((a, b) -> Long.compare(Long.parseLong(b.get("timestamp")), Long.parseLong(a.get("timestamp"))))
-                .limit(30)
                 .collect(Collectors.toList());
 
-        return createResponse(200, mapper.writeValueAsString(alerts));
+        Map<String, Object> responseMap = new HashMap<>();
+        responseMap.put("alerts", alerts);
+        responseMap.put("settings", userSettings);
+
+        return createResponse(200, mapper.writeValueAsString(responseMap));
     }
 
     private APIGatewayProxyResponseEvent handleSaveSettings(APIGatewayProxyRequestEvent input, String userId, String email) throws Exception {
-        JsonNode body = mapper.readTree(input.getBody());
-        double threshold = body.get("threshold").asDouble();
-        String trackedSymbols = body.has("trackedSymbols") ? body.get("trackedSymbols").asText() : "";
+        Map<String, Object> body = mapper.readValue(input.getBody(), Map.class);
 
         dynamoDb.putItem(PutItemRequest.builder()
                 .tableName(SETTINGS_TABLE)
                 .item(Map.of(
                         "userId", AttributeValue.builder().s(userId).build(),
-                        "threshold", AttributeValue.builder().n(String.valueOf(threshold)).build(),
+                        "threshold", AttributeValue.builder().n(String.valueOf(body.get("threshold"))).build(),
                         "email", AttributeValue.builder().s(email).build(),
-                        "trackedSymbols", AttributeValue.builder().s(trackedSymbols).build()
+                        "trackedSymbols", AttributeValue.builder().s(String.valueOf(body.get("trackedSymbols"))).build()
                 ))
                 .build());
 
