@@ -8,7 +8,6 @@
   --border: #2b2f36;
   --success: #02c076;
   --error: #f84960;
-  --glass: rgba(24, 26, 32, 0.95);
 }
 
 body {
@@ -87,51 +86,38 @@ body {
 
 #root [data-amplify-authenticator] {
   background: transparent !important;
-  width: 100% !important;
-  max-width: 440px !important;
-  border: none !important;
   box-shadow: none !important;
+  border: none !important;
 }
 
 #root [data-amplify-container] {
-  background: var(--glass) !important;
+  background: rgba(24, 26, 32, 0.9) !important;
   backdrop-filter: blur(20px);
   border: 1px solid var(--border) !important;
   border-radius: 24px !important;
-  padding: 30px !important;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.7) !important;
+  padding: 20px !important;
 }
 
-.amplify-tabs {
+#root .amplify-tabs {
   border-bottom: 1px solid var(--border) !important;
-  margin-bottom: 25px !important;
 }
 
-.amplify-tabs__item--active {
+#root .amplify-tabs__item--active {
   color: var(--accent) !important;
   border-color: var(--accent) !important;
 }
 
-.amplify-label {
-  color: var(--text-muted) !important;
-  font-size: 11px !important;
-  text-transform: uppercase !important;
-  font-weight: 800 !important;
-}
-
-.amplify-input {
-  background: rgba(0, 0, 0, 0.4) !important;
+#root .amplify-input {
+  background: #0b0e11 !important;
   border: 1px solid var(--border) !important;
   color: white !important;
   border-radius: 12px !important;
-  padding: 14px 16px !important;
 }
 
-.amplify-button--primary {
+#root .amplify-button--primary {
   background: var(--accent) !important;
   border-radius: 12px !important;
   font-weight: 800 !important;
-  padding: 16px !important;
 }
 
 .landing-footer-auth {
@@ -154,8 +140,10 @@ body {
   text-decoration: none;
   font-size: 11px;
   font-weight: 700;
+  transition: 0.3s;
 }
 
+.social-icon-link:hover { color: var(--accent); }
 .social-icon-link svg { width: 16px; height: 16px; fill: currentColor; }
 
 .app-layout {
@@ -207,11 +195,11 @@ body {
 
 .btn-logout {
   width: 100%;
-  padding: 8px;
+  padding: 10px;
   background: rgba(248, 73, 96, 0.1);
   color: var(--error);
   border: 1px solid rgba(248, 73, 96, 0.2);
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 700;
   font-size: 11px;
   cursor: pointer;
@@ -435,8 +423,23 @@ body {
 
 .loading-screen {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   height: 100vh;
   background: var(--bg-dark);
+}
+
+.loader-ring {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(33, 150, 243, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--accent);
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

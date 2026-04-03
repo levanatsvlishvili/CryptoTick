@@ -42,16 +42,18 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
 
                 for (Map<String, AttributeValue> userPref : allUserSettings) {
                     String userId = userPref.get("userId").s();
-                    double threshold = Double.parseDouble(userPref.get("threshold").n());
+                    double thresholdPercent = Double.parseDouble(userPref.get("threshold").n());
+                    double thresholdDecimal = thresholdPercent / 100.0;
+
                     String trackedSymbolsStr = userPref.get("trackedSymbols") != null ? userPref.get("trackedSymbols").s() : "";
                     List<String> trackedList = Arrays.asList(trackedSymbolsStr.split("\\s*,\\s*"));
 
                     if (trackedSymbolsStr.isEmpty() || trackedList.contains(symbol)) {
                         saveToDynamo(symbol, currentPrice, previousPrice, userId);
 
-                        if (change >= threshold && currentPrice != previousPrice) {
-                            sendSnsNotification(symbol, currentPrice, threshold);
-                            context.getLogger().log("!!! SNS Alert for " + userId + " on " + symbol);
+                        if (change >= thresholdDecimal && currentPrice != previousPrice) {
+                            sendSnsNotification(symbol, currentPrice, thresholdPercent);
+                            context.getLogger().log("!!! Alert triggered for " + userId + " on " + symbol + " at " + thresholdPercent + "%");
                         }
                     }
                 }
@@ -77,11 +79,11 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
     }
 
     private void sendSnsNotification(String symbol, double price, double threshold) {
-        String message = String.format("CryptoTick Alert! %s movement detected (>%.2f%%). Price: $%.2f",
-                symbol, threshold * 100, price);
+        String message = String.format("CryptoTick Alert! %s movement detected (>%.2f%%). Current Price: $%.2f",
+                symbol, threshold, price);
         snsClient.publish(PublishRequest.builder()
                 .topicArn(SNS_TOPIC_ARN)
-                .subject("CryptoTick Alert")
+                .subject("CryptoTick Volatility Alert")
                 .message(message)
                 .build());
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Authenticator, View, Text, Heading, useAuthenticator } from '@aws-amplify/ui-react';
+import { Authenticator, View, Text, Heading, useAuthenticator, ThemeProvider } from '@aws-amplify/ui-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import '@aws-amplify/ui-react/styles.css';
@@ -19,6 +19,47 @@ const TIME_RANGES = {
     "1M": 2592000000
 };
 
+const theme = {
+    name: 'crypto-theme',
+    tokens: {
+        colors: {
+            background: {
+                primary: { value: 'transparent' },
+                secondary: { value: 'rgba(0,0,0,0.3)' },
+            },
+            font: {
+                primary: { value: '#eaecef' },
+                secondary: { value: '#707a8a' },
+            },
+            border: { primary: { value: '#2b2f36' } },
+            brand: {
+                primary: {
+                    10: { value: '#2196f3' },
+                    80: { value: '#2196f3' },
+                    90: { value: '#1976d2' },
+                    100: { value: '#1565c0' },
+                },
+            },
+        },
+        components: {
+            authenticator: {
+                router: {
+                    borderWidth: { value: '1px' },
+                    borderColor: { value: '#2b2f36' },
+                    backgroundColor: { value: 'rgba(24, 26, 32, 0.9)' },
+                    borderRadius: { value: '24px' },
+                },
+            },
+            fieldcontrol: {
+                backgroundColor: { value: '#0b0e11' },
+                color: { value: 'white' },
+                borderColor: { value: '#2b2f36' },
+                _focus: { borderColor: { value: '#2196f3' } },
+            },
+        },
+    },
+};
+
 const authFormFields = {
     signUp: {
         email: { order: 1, isRequired: true },
@@ -31,7 +72,7 @@ function Dashboard({ signOut, user }) {
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('ALL');
-    const [threshold, setThreshold] = useState(0.001);
+    const [threshold, setThreshold] = useState(0.1);
     const [selectedSymbols, setSelectedSymbols] = useState(["BTCUSDT", "ETHUSDT"]);
     const [timeRange, setTimeRange] = useState('1H');
     const [currentPage, setCurrentPage] = useState(1);
@@ -46,7 +87,7 @@ function Dashboard({ signOut, user }) {
             const data = await response.json();
             setAlerts(data.alerts || []);
             if (data.settings) {
-                setThreshold(parseFloat(data.settings.threshold || 0.001));
+                setThreshold(parseFloat(data.settings.threshold || 0.1));
                 if (data.settings.trackedSymbols) setSelectedSymbols(data.settings.trackedSymbols.split(", "));
             }
         } catch (err) { console.error(err); }
@@ -75,7 +116,7 @@ function Dashboard({ signOut, user }) {
 
     const toggleSymbol = (sym) => setSelectedSymbols(prev => prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym]);
     const adjustThreshold = (val) => setThreshold(prev => {
-        const newVal = (parseFloat(prev || 0) + val).toFixed(4);
+        const newVal = (parseFloat(prev || 0) + val).toFixed(1);
         return newVal >= 0 ? newVal : 0;
     });
 
@@ -89,7 +130,12 @@ function Dashboard({ signOut, user }) {
     const chartData = [...processedData].reverse().map(a => ({ time: new Date(parseInt(a.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), price: parseFloat(a.price) }));
     const paginatedAlerts = useMemo(() => { const start = (currentPage - 1) * pageSize; return processedData.slice(start, start + pageSize); }, [processedData, currentPage]);
 
-    if (loading) return <div className="loading-screen"><Text color="var(--text-muted)" letterSpacing="4px" fontSize="11px" fontWeight="900">NODE INITIALIZATION</Text></div>;
+    if (loading) return (
+        <div className="loading-screen">
+            <div className="loader-ring"></div>
+            <Text color="var(--text-muted)" letterSpacing="4px" fontSize="11px" fontWeight="900">NODE INITIALIZATION</Text>
+        </div>
+    );
 
     return (
         <div className="app-layout">
@@ -104,11 +150,11 @@ function Dashboard({ signOut, user }) {
                         </div>
                     </div>
                     <div className="sidebar-section">
-                        <span className="sidebar-label">Alert Sensitivity</span>
+                        <span className="sidebar-label">Alert Sensitivity (%)</span>
                         <div className="threshold-control">
-                            <button className="threshold-btn" onClick={() => adjustThreshold(-0.0001)}>−</button>
-                            <input type="number" step="0.0001" className="input-terminal" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
-                            <button className="threshold-btn" onClick={() => adjustThreshold(0.0001)}>+</button>
+                            <button className="threshold-btn" onClick={() => adjustThreshold(-0.1)}>−</button>
+                            <input type="number" step="0.1" className="input-terminal" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+                            <button className="threshold-btn" onClick={() => adjustThreshold(0.1)}>+</button>
                         </div>
                     </div>
                     <div className="sidebar-section">
@@ -168,11 +214,9 @@ function Dashboard({ signOut, user }) {
 
 function AuthWrapper() {
     const { route, user, signOut } = useAuthenticator((context) => [context.route, context.user]);
-
     if (route === 'authenticated' && user) {
         return <Dashboard signOut={signOut} user={user} />;
     }
-
     return (
         <div className="auth-landing-view">
             <div className="auth-info-side">
@@ -216,8 +260,10 @@ function AuthWrapper() {
 
 export default function App() {
     return (
-        <Authenticator.Provider>
-            <AuthWrapper />
-        </Authenticator.Provider>
+        <ThemeProvider theme={theme}>
+            <Authenticator.Provider>
+                <AuthWrapper />
+            </Authenticator.Provider>
+        </ThemeProvider>
     );
 }
