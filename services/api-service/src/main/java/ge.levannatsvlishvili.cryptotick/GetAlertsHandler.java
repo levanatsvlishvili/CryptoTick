@@ -17,6 +17,12 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
     private final String ALERTS_TABLE = "CryptoTick_Alerts";
     private final String SETTINGS_TABLE = "CryptoTick_UserSettings";
 
+    private static final List<String> ALL_SYMBOLS = List.of(
+            "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOTUSDT",
+            "DOGEUSDT", "LINKUSDT", "MATICUSDT", "SHIBUSDT", "LTCUSDT", "TRXUSDT", "BCHUSDT",
+            "UNIUSDT", "NEARUSDT", "APTUSDT", "OPUSDT", "ARBUSDT"
+    );
+
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
         try {
@@ -27,7 +33,7 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
 
             String method = input.getHttpMethod();
             if ("GET".equalsIgnoreCase(method)) {
-                return handleGetCombinedData(userId);
+                return handleGetCombinedData(userId, email);
             } else if ("POST".equalsIgnoreCase(method)) {
                 return handleSaveSettings(input, userId, email);
             }
@@ -37,7 +43,7 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
         }
     }
 
-    private APIGatewayProxyResponseEvent handleGetCombinedData(String userId) throws Exception {
+    private APIGatewayProxyResponseEvent handleGetCombinedData(String userId, String email) throws Exception {
         GetItemResponse settingsResp = dynamoDb.getItem(GetItemRequest.builder()
                 .tableName(SETTINGS_TABLE)
                 .key(Map.of("userId", AttributeValue.builder().s(userId).build()))
@@ -46,20 +52,15 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
         Map<String, String> userSettings = new HashMap<>();
         if (settingsResp.hasItem()) {
             settingsResp.item().forEach((k, v) -> userSettings.put(k, v.s() != null ? v.s() : v.n()));
+        } else {
+            userSettings.put("userId", userId);
+            if (email != null) userSettings.put("email", email);
+            userSettings.put("threshold", "0.1");
+            userSettings.put("trackedSymbols", "BTCUSDT, ETHUSDT");
         }
 
-        ScanResponse alertsResp = dynamoDb.scan(ScanRequest.builder()
-                .tableName(ALERTS_TABLE)
-                .filterExpression("userId = :uid")
-                .expressionAttributeValues(Map.of(":uid", AttributeValue.builder().s(userId).build()))
-                .build());
-
-        List<Map<String, String>> alerts = alertsResp.items().stream()
-                .map(item -> {
-                    Map<String, String> map = new HashMap<>();
-                    item.forEach((k, v) -> map.put(k, v.s() != null ? v.s() : v.n()));
-                    return map;
-                })
+        List<Map<String, String>> alerts = ALL_SYMBOLS.parallelStream()
+                .flatMap(symbol -> fetchRecentTicks(symbol, 200).stream())
                 .sorted((a, b) -> Long.compare(Long.parseLong(b.get("timestamp")), Long.parseLong(a.get("timestamp"))))
                 .collect(Collectors.toList());
 
@@ -70,17 +71,51 @@ public class GetAlertsHandler implements RequestHandler<APIGatewayProxyRequestEv
         return createResponse(200, mapper.writeValueAsString(responseMap));
     }
 
+    private List<Map<String, String>> fetchRecentTicks(String symbol, int limit) {
+        try {
+            QueryResponse queryResp = dynamoDb.query(QueryRequest.builder()
+                    .tableName(ALERTS_TABLE)
+                    .keyConditionExpression("symbol = :sym")
+                    .expressionAttributeValues(Map.of(":sym", AttributeValue.builder().s(symbol).build()))
+                    .scanIndexForward(false)
+                    .limit(limit)
+                    .build());
+
+            List<Map<String, String>> results = new ArrayList<>();
+            long lastTimestamp = Long.MAX_VALUE;
+
+            for (Map<String, AttributeValue> item : queryResp.items()) {
+                if (item.get("timestamp") == null || item.get("price") == null) continue;
+                long ts = Long.parseLong(item.get("timestamp").n());
+
+                // Deduplicate consecutive records within 30 seconds for the same symbol
+                if (Math.abs(lastTimestamp - ts) < 30_000) {
+                    continue;
+                }
+                lastTimestamp = ts;
+
+                Map<String, String> map = new HashMap<>();
+                item.forEach((k, v) -> map.put(k, v.s() != null ? v.s() : v.n()));
+                results.add(map);
+            }
+            return results;
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
     private APIGatewayProxyResponseEvent handleSaveSettings(APIGatewayProxyRequestEvent input, String userId, String email) throws Exception {
         Map<String, Object> body = mapper.readValue(input.getBody(), Map.class);
 
+        Map<String, AttributeValue> item = new HashMap<>();
+        item.put("userId", AttributeValue.builder().s(userId).build());
+        item.put("threshold", AttributeValue.builder().n(String.valueOf(body.get("threshold"))).build());
+        item.put("email", AttributeValue.builder().s(email != null && !email.isEmpty() ? email : "unknown").build());
+        item.put("trackedSymbols", AttributeValue.builder().s(String.valueOf(body.get("trackedSymbols"))).build());
+
         dynamoDb.putItem(PutItemRequest.builder()
                 .tableName(SETTINGS_TABLE)
-                .item(Map.of(
-                        "userId", AttributeValue.builder().s(userId).build(),
-                        "threshold", AttributeValue.builder().n(String.valueOf(body.get("threshold"))).build(),
-                        "email", AttributeValue.builder().s(email).build(),
-                        "trackedSymbols", AttributeValue.builder().s(String.valueOf(body.get("trackedSymbols"))).build()
-                ))
+                .item(item)
                 .build());
 
         return createResponse(200, "{\"message\":\"Settings saved successfully\"}");

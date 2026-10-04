@@ -79,15 +79,15 @@ function Dashboard({ signOut, user }) {
     const [toast, setToast] = useState(null);
     const pageSize = 8;
 
-    const getInitialData = async () => {
+    const getInitialData = async (isInitial = false) => {
         try {
             const session = await fetchAuthSession();
             const token = session.tokens.idToken.toString();
             const response = await fetch(API_URL, { headers: { 'Authorization': token } });
             const data = await response.json();
             setAlerts(data.alerts || []);
-            if (data.settings) {
-                setThreshold(parseFloat(data.settings.threshold || 0.1));
+            if (data.settings && isInitial) {
+                if (data.settings.threshold !== undefined) setThreshold(parseFloat(data.settings.threshold || 0.1));
                 if (data.settings.trackedSymbols) setSelectedSymbols(data.settings.trackedSymbols.split(", "));
             }
         } catch (err) { console.error(err); }
@@ -109,8 +109,8 @@ function Dashboard({ signOut, user }) {
     };
 
     useEffect(() => {
-        getInitialData();
-        const interval = setInterval(getInitialData, 30000);
+        getInitialData(true);
+        const interval = setInterval(() => getInitialData(false), 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -127,7 +127,16 @@ function Dashboard({ signOut, user }) {
         return filtered;
     }, [alerts, timeRange, activeTab]);
 
-    const chartData = [...processedData].reverse().map(a => ({ time: new Date(parseInt(a.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), price: parseFloat(a.price) }));
+    const chartData = useMemo(() => {
+        const symbolToChart = activeTab === 'ALL' ? (selectedSymbols[0] || 'BTCUSDT') : activeTab;
+        const cutoff = Date.now() - TIME_RANGES[timeRange];
+        const symbolData = alerts.filter(a => a.symbol === symbolToChart && parseInt(a.timestamp) >= cutoff);
+        return [...symbolData].reverse().map(a => ({
+            time: new Date(parseInt(a.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: parseFloat(a.price)
+        }));
+    }, [alerts, timeRange, activeTab, selectedSymbols]);
+
     const paginatedAlerts = useMemo(() => { const start = (currentPage - 1) * pageSize; return processedData.slice(start, start + pageSize); }, [processedData, currentPage]);
 
     if (loading) return (
@@ -182,7 +191,7 @@ function Dashboard({ signOut, user }) {
                 </nav>
                 <div className="card" style={{ height: '440px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>TRAJECTORY: {activeTab} ({timeRange})</span>
+                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>TRAJECTORY: {activeTab === 'ALL' ? `${(selectedSymbols[0] || 'BTCUSDT').replace('USDT', '')} (PRIMARY)` : activeTab.replace('USDT', '')} ({timeRange})</span>
                         <Text color="var(--success)" fontSize="11px" fontWeight={800}>● LIVE TELEMETRY</Text>
                     </div>
                     <ResponsiveContainer width="100%" height="90%">
@@ -199,11 +208,13 @@ function Dashboard({ signOut, user }) {
                 <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
                     <table className="data-table">
                         <thead><tr style={{ background: 'rgba(255,255,255,0.01)' }}><th>Asset</th><th>Price Transition</th><th>Delta</th><th>Timestamp</th></tr></thead>
-                        <tbody>{paginatedAlerts.map((alert, index) => {
+                        <tbody>{paginatedAlerts.length > 0 ? paginatedAlerts.map((alert, index) => {
                             const diff = parseFloat(alert.price) - parseFloat(alert.oldPrice);
-                            const pct = ((diff / parseFloat(alert.oldPrice)) * 100).toFixed(4);
+                            const pct = alert.oldPrice && parseFloat(alert.oldPrice) > 0 ? ((diff / parseFloat(alert.oldPrice)) * 100).toFixed(4) : "0.0000";
                             return (<tr key={index}><td style={{ fontWeight: 800 }}>{alert.symbol.replace('USDT', '')}</td><td><span style={{ color: 'var(--text-muted)' }}>${parseFloat(alert.oldPrice).toLocaleString()}</span><span style={{ margin: '0 12px', color: 'var(--accent)', fontWeight: 900 }}>➔</span><span style={{ fontWeight: 600 }}>${parseFloat(alert.price).toLocaleString()}</span></td><td style={{ color: diff >= 0 ? 'var(--success)' : 'var(--error)', fontWeight: 800 }}>{diff >= 0 ? '▲' : '▼'} {Math.abs(pct)}%</td><td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{new Date(parseInt(alert.timestamp)).toLocaleString()}</td></tr>);
-                        })}</tbody>
+                        }) : (
+                            <tr><td colSpan="4" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)', letterSpacing: '1px' }}>NO TELEMETRY EVENTS RECORDED FOR THIS FILTER</td></tr>
+                        )}</tbody>
                     </table>
                     <div className="pagination"><button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>PREV</button><span>PAGE {currentPage}</span><button disabled={paginatedAlerts.length < pageSize} onClick={() => setCurrentPage(prev => prev + 1)}>NEXT</button></div>
                 </div>

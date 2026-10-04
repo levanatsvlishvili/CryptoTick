@@ -40,17 +40,17 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
                 double previousPrice = lastPrices.getOrDefault(symbol, currentPrice);
                 double change = Math.abs(currentPrice - previousPrice) / previousPrice;
 
+                saveToDynamo(symbol, currentPrice, previousPrice);
+
                 for (Map<String, AttributeValue> userPref : allUserSettings) {
-                    String userId = userPref.get("userId").s();
-                    double thresholdPercent = Double.parseDouble(userPref.get("threshold").n());
+                    String userId = userPref.get("userId") != null ? userPref.get("userId").s() : "unknown";
+                    double thresholdPercent = userPref.get("threshold") != null ? Double.parseDouble(userPref.get("threshold").n()) : 5.0;
                     double thresholdDecimal = thresholdPercent / 100.0;
 
                     String trackedSymbolsStr = userPref.get("trackedSymbols") != null ? userPref.get("trackedSymbols").s() : "";
                     List<String> trackedList = Arrays.asList(trackedSymbolsStr.split("\\s*,\\s*"));
 
                     if (trackedSymbolsStr.isEmpty() || trackedList.contains(symbol)) {
-                        saveToDynamo(symbol, currentPrice, previousPrice, userId);
-
                         if (change >= thresholdDecimal && currentPrice != previousPrice) {
                             sendSnsNotification(symbol, currentPrice, thresholdPercent);
                             context.getLogger().log("!!! Alert triggered for " + userId + " on " + symbol + " at " + thresholdPercent + "%");
@@ -65,11 +65,10 @@ public class AnalyticsHandler implements RequestHandler<SQSEvent, String> {
         return "Success";
     }
 
-    private void saveToDynamo(String symbol, double price, double oldPrice, String userId) {
+    private void saveToDynamo(String symbol, double price, double oldPrice) {
         dynamoDb.putItem(PutItemRequest.builder()
                 .tableName(ALERTS_TABLE)
                 .item(Map.of(
-                        "userId", AttributeValue.builder().s(userId).build(),
                         "symbol", AttributeValue.builder().s(symbol).build(),
                         "timestamp", AttributeValue.builder().n(String.valueOf(System.currentTimeMillis())).build(),
                         "price", AttributeValue.builder().n(String.valueOf(price)).build(),
